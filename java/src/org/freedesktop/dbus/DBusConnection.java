@@ -12,6 +12,8 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
+import android.net.LocalSocketAddress;
+
 import java.lang.reflect.Proxy;
 
 import java.io.BufferedReader;
@@ -191,7 +193,7 @@ public class DBusConnection extends AbstractConnection
     */
    public static final int SESSION = 1;
 
-   public static final String DEFAULT_SYSTEM_BUS_ADDRESS = "unix:path=/var/run/dbus/system_bus_socket";
+   public static final String DEFAULT_SYSTEM_BUS_ADDRESS = "unix:path=/dev/socket/dbus";
 
    private List<String> busnames;
 
@@ -233,41 +235,10 @@ public class DBusConnection extends AbstractConnection
          String s = null;
          switch (bustype) {
             case SYSTEM:
-               s = System.getenv("DBUS_SYSTEM_BUS_ADDRESS");
                if (null == s) s = DEFAULT_SYSTEM_BUS_ADDRESS;
                break;
             case SESSION:
-               s = System.getenv("DBUS_SESSION_BUS_ADDRESS");
-               if (null == s) {
-						// address gets stashed in $HOME/.dbus/session-bus/`dbus-uuidgen --get`-`sed 's/:\(.\)\..*/\1/' <<< $DISPLAY`
-						String display = System.getenv("DISPLAY");
-						if (null == display) throw new DBusException(_("Cannot Resolve Session Bus Address"));
-						File uuidfile = new File("/var/lib/dbus/machine-id");
-						if (!uuidfile.exists()) throw new DBusException(_("Cannot Resolve Session Bus Address"));
-						try {
-							BufferedReader r = new BufferedReader(new FileReader(uuidfile));
-							String uuid = r.readLine();
-							String homedir = System.getProperty("user.home");
-							File addressfile = new File(homedir + "/.dbus/session-bus",
-									uuid + "-" + display.replaceAll(":([0-9]*)\\..*", "$1"));
-							if (!addressfile.exists()) throw new DBusException(_("Cannot Resolve Session Bus Address"));
-							r = new BufferedReader(new FileReader(addressfile));
-							String l;
-							while (null != (l = r.readLine())) {
-								if (Debug.debug) Debug.print(Debug.VERBOSE, "Reading D-Bus session data: "+l);
-								if (l.matches("DBUS_SESSION_BUS_ADDRESS.*")) {
-									s = l.replaceAll("^[^=]*=", "");
-									if (Debug.debug) Debug.print(Debug.VERBOSE, "Parsing "+l+" to "+s);
-								}
-							}
-							if (null == s || "".equals(s)) throw new DBusException(_("Cannot Resolve Session Bus Address"));
-							if (Debug.debug) Debug.print(Debug.INFO, "Read bus address "+s+" from file "+addressfile.toString());
-						} catch (Exception e) {
-							if (EXCEPTION_DEBUG && Debug.debug) Debug.print(Debug.ERR, e);
-							throw new DBusException(_("Cannot Resolve Session Bus Address"));
-						}
-					}
-               break;
+                throw new RuntimeException("not supported on android");   
             default:
                throw new DBusException(_("Invalid Bus Type: ")+bustype);
          }
@@ -295,17 +266,19 @@ public class DBusConnection extends AbstractConnection
          _refcount = 1; 
       }
    
+      LocalSocketAddress addr;
+      if (address.equals("unix:path=/dev/socket/dbus"))
+          addr = new LocalSocketAddress("dbus",
+                  LocalSocketAddress.Namespace.RESERVED);
+      else
+          throw new RuntimeException("not supported on Android");
       try {
          transport = new Transport(addr, AbstractConnection.TIMEOUT);
-			connected = true;
-      } catch (IOException IOe) {
+         connected = true;
+      } catch (Exception IOe) {
          if (EXCEPTION_DEBUG && Debug.debug) Debug.print(Debug.ERR, IOe);            
          disconnect();
          throw new DBusException(_("Failed to connect to bus ")+IOe.getMessage());
-      } catch (ParseException Pe) {
-         if (EXCEPTION_DEBUG && Debug.debug) Debug.print(Debug.ERR, Pe);            
-         disconnect();
-         throw new DBusException(_("Failed to connect to bus ")+Pe.getMessage());
       }
 
       // start listening for calls
@@ -321,7 +294,7 @@ public class DBusConnection extends AbstractConnection
       try {
          busnames.add(_dbus.Hello());
       } catch (DBusExecutionException DBEe) {
-         if (EXCEPTION_DEBUG && Debug.debug) Debug.print(Debug.ERR, DBEe);
+         Debug.print(Debug.ERR, DBEe);
          throw new DBusException(DBEe.getMessage());
       }
    }

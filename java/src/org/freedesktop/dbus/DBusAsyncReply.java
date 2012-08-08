@@ -66,7 +66,7 @@ public class DBusAsyncReply<ReturnType>
             } catch (DBusExecutionException DBEe) {
                error = DBEe;
             } catch (DBusException DBe) {
-               if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug) Debug.print(Debug.ERR, DBe);
+               Debug.print(Debug.ERR, DBe);
                error = new DBusExecutionException(DBe.getMessage());
             }
          }

@@ -32,9 +32,14 @@ import java.text.Collator;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.Vector;
-import cx.ath.matthew.unix.UnixSocket;
-import cx.ath.matthew.unix.UnixServerSocket;
-import cx.ath.matthew.unix.UnixSocketAddress;
+
+import android.net.LocalServerSocket;
+import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
+import android.util.Log;
+
+import org.freedesktop.dbus.Message;
+
 import cx.ath.matthew.utils.Hexdump;
 import cx.ath.matthew.debug.Debug;
 
@@ -464,7 +469,8 @@ public class Transport
        * Returns true if the auth was successful and false if it failed.
        */
       @SuppressWarnings("unchecked")
-      public boolean auth(int mode, int types, String guid, OutputStream out, InputStream in, UnixSocket us) throws IOException
+      public boolean auth(int mode, int types, String guid, OutputStream out, 
+              InputStream in, LocalSocket us) throws IOException
       {
          String username = System.getProperty("user.name");
          String Uid = null;
@@ -491,8 +497,8 @@ public class Transport
                      case INITIAL_STATE:
                         if (null == us)
                            out.write(new byte[] { 0 });
-                        else 
-                           us.sendCredentialByte((byte) 0);
+                        else
+                            throw new RuntimeException("not supported on Android");
                         send(out, COMMAND_AUTH);
                         state = WAIT_DATA;
                         break;
@@ -602,109 +608,7 @@ public class Transport
                   }
                   break;
                case MODE_SERVER:
-                  switch (state) {
-                     case INITIAL_STATE:
-                        byte[] buf = new byte[1];
-                        if (null == us) {
-                           in.read(buf);
-                        } else {
-                           buf[0] = us.recvCredentialByte();
-                           int kuid = us.getPeerUID();
-                           if (kuid >= 0)
-                              kernelUid = stupidlyEncode(""+kuid);
-                        }
-                        if (0 != buf[0]) state = FAILED;
-                        else state = WAIT_AUTH;
-                        break;
-                     case WAIT_AUTH:
-                        c = receive(in);
-                        switch (c.getCommand()) {
-                           case COMMAND_AUTH:
-                              if (null == c.getData()) {
-                                 send(out, COMMAND_REJECTED, getTypes(types));
-                              } else {
-                                 switch (do_response(current, Uid, kernelUid, c)) {
-                                    case CONTINUE:
-                                       send(out, COMMAND_DATA, c.getResponse());
-                                       current = c.getMechs();
-                                       state = WAIT_DATA;
-                                       break;
-                                    case OK:
-                                       send(out, COMMAND_OK, guid);
-                                       state = WAIT_BEGIN;
-                                       current = 0;
-                                       break;
-                                    case REJECT:
-                                       send(out, COMMAND_REJECTED, getTypes(types));
-                                       current = 0;
-                                       break;
-                                 }
-                              }
-                              break;
-                           case COMMAND_ERROR:
-                              send(out, COMMAND_REJECTED, getTypes(types));
-                              break;
-                           case COMMAND_BEGIN:
-                              state = FAILED;
-                              break;
-                           default:
-                              send(out, COMMAND_ERROR, "Got invalid command");
-                              break;
-                        }
-                        break;
-                     case WAIT_DATA:
-                        c = receive(in);
-                        switch (c.getCommand()) {
-                           case COMMAND_DATA:
-                              switch (do_response(current, Uid, kernelUid, c)) {
-                                 case CONTINUE:
-                                    send(out, COMMAND_DATA, c.getResponse());
-                                    state = WAIT_DATA;
-                                    break;
-                                 case OK:
-                                    send(out, COMMAND_OK, guid);
-                                    state = WAIT_BEGIN;
-                                    current = 0;
-                                    break;
-                                 case REJECT:
-                                    send(out, COMMAND_REJECTED, getTypes(types));
-                                    current = 0;
-                                    break;
-                              }
-                              break;
-                           case COMMAND_ERROR:
-                           case COMMAND_CANCEL:
-                              send(out, COMMAND_REJECTED, getTypes(types));
-                              state = WAIT_AUTH;
-                              break;
-                           case COMMAND_BEGIN:
-                              state = FAILED;
-                              break;
-                           default:
-                              send(out, COMMAND_ERROR, "Got invalid command");
-                              break;
-                        }
-                        break;
-                     case WAIT_BEGIN:
-                        c = receive(in);
-                        switch (c.getCommand()) {
-                           case COMMAND_ERROR:
-                           case COMMAND_CANCEL:
-                              send(out, COMMAND_REJECTED, getTypes(types));
-                              state = WAIT_AUTH;
-                              break;
-                           case COMMAND_BEGIN:
-                              state = AUTHENTICATED;
-                              break;
-                           default:
-                              send(out, COMMAND_ERROR, "Got invalid command");
-                              break;
-                        }
-                        break;
-                     default:
-                        state = FAILED;
-                  }
-                  break;
+                   throw new RuntimeException("not supported on android");
                default:
                   return false;
             }
@@ -724,86 +628,61 @@ public class Transport
       String guid = Hexdump.toHex(buf);
       return guid.replaceAll(" ", "");
    }
-   public Transport(BusAddress address) throws IOException
-   {
-      connect(address);
-   }
-   public Transport(String address) throws IOException, ParseException
-   {
-      connect(new BusAddress(address));
-   }
-   public Transport(String address, int timeout) throws IOException, ParseException
-   {
-      connect(new BusAddress(address), timeout);
-   }
-   public void connect(String address) throws IOException, ParseException
-   {
-      connect(new BusAddress(address), 0);
-   }
-   public void connect(String address, int timeout) throws IOException, ParseException
-   {
-      connect(new BusAddress(address), timeout);
-   }
-   public void connect(BusAddress address) throws IOException
+   public Transport(LocalSocketAddress address) throws IOException
    {
       connect(address, 0);
    }
-   public void connect(BusAddress address, int timeout) throws IOException
+   public Transport(LocalSocketAddress address, int timeout) throws IOException
+   {
+      connect(address, timeout);
+   }
+   public Transport(String address) throws IOException, ParseException
+   {
+      connect(new LocalSocketAddress(address));
+   }
+   public Transport(String address, int timeout) throws IOException, ParseException
+   {
+      connect(new LocalSocketAddress(address), timeout);
+   }
+   public void connect(String address) throws IOException, ParseException
+   {
+      connect(new LocalSocketAddress(address), 0);
+   }
+   public void connect(String address, int timeout) throws IOException, ParseException
+   {
+      connect(new LocalSocketAddress(address), timeout);
+   }
+   public void connect(LocalSocketAddress address) throws IOException
+   {
+      connect(address, 0);
+   }
+   public void connect(LocalSocketAddress address, int timeout) throws IOException
    {
       if (Debug.debug) Debug.print(Debug.INFO, "Connecting to "+address);
       OutputStream out = null;
       InputStream in = null;
-      UnixSocket us = null;
+      LocalSocket us = null;
       Socket s = null;
       int mode = 0;
       int types = 0;
-      if ("unix".equals(address.getType())) {
-         types = SASL.AUTH_EXTERNAL;
-         if (null != address.getParameter("listen")) {
-            mode = SASL.MODE_SERVER;
-            UnixServerSocket uss = new UnixServerSocket();
-            if (null != address.getParameter("abstract"))
-               uss.bind(new UnixSocketAddress(address.getParameter("abstract"), true));
-            else if (null != address.getParameter("path"))
-               uss.bind(new UnixSocketAddress(address.getParameter("path"), false));
-            us = uss.accept();
-         } else {
-            mode = SASL.MODE_CLIENT;
-            us = new UnixSocket();
-            if (null != address.getParameter("abstract"))
-               us.connect(new UnixSocketAddress(address.getParameter("abstract"), true));
-            else if (null != address.getParameter("path"))
-               us.connect(new UnixSocketAddress(address.getParameter("path"), false));
-         }
-         us.setPassCred(true);
-         in = us.getInputStream();
-         out = us.getOutputStream();
-      } else if ("tcp".equals(address.getType())) {
-         types = SASL.AUTH_SHA;
-         if (null != address.getParameter("listen")) {
-            mode = SASL.MODE_SERVER;
-            ServerSocket ss = new ServerSocket();
-            ss.bind(new InetSocketAddress(address.getParameter("host"), Integer.parseInt(address.getParameter("port"))));
-            s = ss.accept();
-         } else {
-            mode = SASL.MODE_CLIENT;
-            s = new Socket();
-            s.connect(new InetSocketAddress(address.getParameter("host"), Integer.parseInt(address.getParameter("port"))));
-         }
-         in = s.getInputStream();
-         out = s.getOutputStream();
-      } else {
-         throw new IOException(_("unknown address type ")+address.getType());
-      }
       
-      if (!(new SASL()).auth(mode, types, address.getParameter("guid"), out, in, us)) {
-         out.close();
-         throw new IOException(_("Failed to auth"));
-      }
+      mode = SASL.MODE_CLIENT;
+      us = new LocalSocket();
+      Log.i("MANU", "About to connect to: " + address.getName() + ", " + address.getNamespace());
+      us.connect(address);
+
+      in = us.getInputStream();
+      out = us.getOutputStream();
+
+      
+      //if (!(new SASL()).auth(mode, types, address.getParameter("guid"), out, in, us)) {
+      //   out.close();
+      //   throw new IOException(_("Failed to auth"));
+      //}
       if (null != us) {
          if (Debug.debug) Debug.print(Debug.VERBOSE, "Setting timeout to "+timeout+" on Socket");
          if (timeout == 1)
-            us.setBlocking(false);
+             us.setSoTimeout(0);
          else
             us.setSoTimeout(timeout);
       }

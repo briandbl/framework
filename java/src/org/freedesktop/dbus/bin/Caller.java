@@ -10,12 +10,13 @@
 */
 package org.freedesktop.dbus.bin;
 
+import android.net.LocalSocketAddress;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Vector;
 import java.io.File;
-import org.freedesktop.dbus.BusAddress;
 import org.freedesktop.dbus.Error;
 import org.freedesktop.dbus.Marshalling;
 import org.freedesktop.dbus.Message;
@@ -38,7 +39,7 @@ public class Caller
             System.exit(1);
          }
          String addr = System.getenv("DBUS_SESSION_BUS_ADDRESS");
-         BusAddress address = new BusAddress(addr);
+         LocalSocketAddress address = new LocalSocketAddress(addr);
          Transport conn = new Transport(address);
 
          Message m = new MethodCall("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "Hello", (byte) 0, null);;

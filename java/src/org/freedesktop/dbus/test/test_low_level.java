@@ -9,8 +9,10 @@
    Full licence texts are included in the COPYING file with this program.
 */
 package org.freedesktop.dbus.test;
+import android.net.LocalSocketAddress;
+
 import cx.ath.matthew.debug.Debug;
-import org.freedesktop.dbus.BusAddress;
+
 import org.freedesktop.dbus.DBusSignal;
 import org.freedesktop.dbus.Message;
 import org.freedesktop.dbus.MethodCall;
@@ -23,7 +25,7 @@ public class test_low_level
       Debug.setHexDump(true);
       String addr = System.getenv("DBUS_SESSION_BUS_ADDRESS");
       Debug.print(addr);
-      BusAddress address = new BusAddress(addr);
+      LocalSocketAddress address = new LocalSocketAddress(addr);
       Debug.print(address);
 
       Transport conn = new Transport(address);
