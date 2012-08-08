@@ -7,7 +7,8 @@
    Academic Free Licence Version 2.1.
 
    Full licence texts are included in the COPYING file with this program.
-*/
+ */
+
 package org.freedesktop.dbus;
 
 import java.lang.annotation.ElementType;
@@ -16,13 +17,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Position annotation, to annotate Struct fields
- * to be sent over DBus.
+ * Position annotation, to annotate Struct fields to be sent over DBus.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
 public @interface Position
 {
-   /** The order of this field in the Struct. */
-   int value();
+    /** The order of this field in the Struct. */
+    int value();
 }

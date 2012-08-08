@@ -7,14 +7,18 @@
    Academic Free Licence Version 2.1.
 
    Full licence texts are included in the COPYING file with this program.
-*/
+ */
+
 package org.freedesktop.dbus;
+
 import org.freedesktop.dbus.exceptions.DBusException;
+
 class InternalSignal extends DBusSignal
 {
-   public InternalSignal(String source, String objectpath, String name, String iface, String sig, long serial, Object... parameters) throws DBusException
-   {
-      super(objectpath, iface, name, sig, parameters);
-      this.serial = serial;
-   }
+    public InternalSignal(String source, String objectpath, String name, String iface, String sig,
+            long serial, Object... parameters) throws DBusException
+    {
+        super(objectpath, iface, name, sig, parameters);
+        this.serial = serial;
+    }
 }
