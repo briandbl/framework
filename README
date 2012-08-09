@@ -1,0 +1,42 @@
+Installable Android Bluetooth Low Energy API
+=============================================
+
+Concept
+========
+
+So it's been a while since Bluetooth 4.0 was announced, and many cellphones 
+that are on the market have support for it. Some OEMs are even starting to
+manufacture they're own devices that are compatible with it, but there's 
+still no official API on Android to talk to them. This project intends to
+fill this gap by providing a vendor extension that can be installed on top
+of a rooted device without having to recompile a custom Android like 
+Cyagogen Mod.
+
+
+Building Blocks
+================
+
+BlueZ since before 4.93 (BlueZ for ICS) provides with API that allows to
+discover BTLE devices over DBus and read and write Characteristics to it to.
+
+The project uses this API as a base so no changes to BlueZ has to be done.
+We talk to this API by using dbus-java, this service will register it self
+with SystemServer so that it can be exposed to user space API using Binder
+
+DBus API in use
+----------------
+
+DBus API that I'm going to use are the ones from:
+     * docs/adapter-api.txt [2]
+     * docs/attribute-api.txt [1]
+     * docs/manager-api.txt [3]     
+[1] http://goo.gl/ZYUPj
+[2] http://goo.gl/1wR5O
+[3] http://goo.gl/VjTcR
+
+Status
+=======
+
+* DBus gets connected
+* Writting interfaces for BlueZ.
+
