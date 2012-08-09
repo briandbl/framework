@@ -1,8 +1,8 @@
-package android.server.le.dbus;
+package org.bluez;
 
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 
-public interface Errors {
+public interface Error {
     @SuppressWarnings("serial")
     public class DoesNotExist extends DBusExecutionException
     {

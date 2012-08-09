@@ -17,7 +17,6 @@
 package android.server.le;
 
 import android.bluetooth.BluetoothAdapter;
-import android.server.le.dbus.IManager;
 import android.util.Log;
 import android.os.ServiceManager;
 import android.os.Looper;
@@ -25,8 +24,7 @@ import android.os.Process;
 
 import com.android.internal.os.BinderInternal;
 
-import org.freedesktop.dbus.DBusInterface;
-import org.freedesktop.dbus.Path;
+import org.bluez.Manager;
 import org.freedesktop.dbus.DBusConnection;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusException;
@@ -40,7 +38,7 @@ class ServerThread extends Thread {
     private static final boolean DBG = false;
     private DBusConnection connection;
     
-    private IManager manager;
+    private Manager manager;
 
     public void connectDBus(){
         if (connection != null)
@@ -54,10 +52,10 @@ class ServerThread extends Thread {
         }
     }
     
-    private IManager getBluezManager(){
-        IManager out;
+    private Manager getBluezManager(){
+        Manager out;
         try {
-            out = connection.getRemoteObject("org.bluez", "/", IManager.class);
+            out = connection.getRemoteObject("org.bluez", "/", Manager.class);
         } catch (DBusException e) {
             Log.e(TAG, "BlueZ isn't available", e);
             return null;
