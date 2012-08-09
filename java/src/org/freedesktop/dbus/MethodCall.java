@@ -13,14 +13,46 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
-import java.util.Vector;
+import android.util.Log;
+
+import cx.ath.matthew.utils.Hexdump;
+
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.MessageFormatException;
-import cx.ath.matthew.debug.Debug;
-import cx.ath.matthew.utils.Hexdump;
+
+import java.util.Vector;
 
 public class MethodCall extends Message
 {
+    private static final String TAG = "DBus-DC";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(Object o) {
+        debug(DEBUG, o);
+    }
+
     MethodCall() {
     }
 
@@ -83,8 +115,8 @@ public class MethodCall extends Message
         });
 
         if (null != sig) {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Appending arguments with signature: " + sig);
+
+            debug(DEBUG, "Appending arguments with signature: " + sig);
             hargs.add(new Object[] {
                     Message.HeaderField.SIGNATURE, new Object[] {
                             ArgumentType.SIGNATURE_STRING, sig
@@ -102,12 +134,12 @@ public class MethodCall extends Message
         long c = bytecounter;
         if (null != sig)
             append(sig, args);
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Appended body, type: " + sig + " start: " + c + " end: "
-                    + bytecounter + " size: " + (bytecounter - c));
+
+        debug(DEBUG, "Appended body, type: " + sig + " start: " + c + " end: "
+                + bytecounter + " size: " + (bytecounter - c));
         marshallint(bytecounter - c, blen, 0, 4);
-        if (Debug.debug)
-            Debug.print("marshalled size (" + blen + "): " + Hexdump.format(blen));
+
+        debug(DEBUG, "marshalled size (" + blen + "): " + Hexdump.format(blen));
     }
 
     private static long REPLY_WAIT_TIMEOUT = 20000;
@@ -137,8 +169,8 @@ public class MethodCall extends Message
      */
     public synchronized Message getReply(long timeout)
     {
-        if (Debug.debug)
-            Debug.print(Debug.VERBOSE, "Blocking on " + this);
+
+        debug(VERBOSE, "Blocking on " + this);
         if (null != reply)
             return reply;
         try {
@@ -157,8 +189,8 @@ public class MethodCall extends Message
      */
     public synchronized Message getReply()
     {
-        if (Debug.debug)
-            Debug.print(Debug.VERBOSE, "Blocking on " + this);
+
+        debug(VERBOSE, "Blocking on " + this);
         if (null != reply)
             return reply;
         try {
@@ -171,8 +203,8 @@ public class MethodCall extends Message
 
     protected synchronized void setReply(Message reply)
     {
-        if (Debug.debug)
-            Debug.print(Debug.VERBOSE, "Setting reply to " + this + " to " + reply);
+
+        debug(VERBOSE, "Setting reply to " + this + " to " + reply);
         this.reply = reply;
         notifyAll();
     }

@@ -13,6 +13,8 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
+import android.util.Log;
+
 import java.lang.reflect.Constructor;
 import java.util.Vector;
 import org.freedesktop.dbus.exceptions.DBusException;
@@ -20,13 +22,41 @@ import org.freedesktop.dbus.exceptions.DBusExecutionException;
 import org.freedesktop.dbus.exceptions.MessageFormatException;
 import org.freedesktop.dbus.exceptions.NotConnected;
 
-import cx.ath.matthew.debug.Debug;
 
 /**
  * Error messages which can be sent over the bus.
  */
 public class Error extends Message
 {
+    private static final String TAG="DBus-Error";
+    
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL=INFO;
+    
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o){
+        Log.e(TAG, "error", o);
+    } 
+    
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o){
+        if (l>=LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+    
+    @SuppressWarnings("unused")
+    private static void debug(Object o){
+        debug(DEBUG, o);
+    }
+    
     Error() {
     }
 
@@ -149,10 +179,7 @@ public class Error extends Message
             ex.setType(getName());
             return ex;
         } catch (Exception e) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, e);
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug && null != e.getCause())
-                Debug.print(Debug.ERR, e.getCause());
+            debug(e);
             DBusExecutionException ex;
             Object[] args = null;
             try {

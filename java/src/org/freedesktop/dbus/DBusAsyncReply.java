@@ -13,6 +13,8 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
+import android.util.Log;
+
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,13 +24,35 @@ import org.freedesktop.DBus.Error.NoReply;
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 
-import cx.ath.matthew.debug.Debug;
-
 /**
  * A handle to an asynchronous method call.
  */
 public class DBusAsyncReply<ReturnType>
 {
+    private static final String TAG="DBus-AsyncReply";
+    
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL=INFO;
+    
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o){
+        Log.e(TAG, "error", o);
+    } 
+    
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o){
+        if (l>=LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }  
+    
     /**
      * Check if any of a set of asynchronous calls have had a reply.
      * 
@@ -72,9 +96,10 @@ public class DBusAsyncReply<ReturnType>
                     rval = (ReturnType) RemoteInvocationHandler.convertRV(m.getSig(),
                             m.getParameters(), me, conn);
                 } catch (DBusExecutionException DBEe) {
+                    debug(DBEe);
                     error = DBEe;
                 } catch (DBusException DBe) {
-                    Debug.print(Debug.ERR, DBe);
+                    debug(DBe);
                     error = new DBusExecutionException(DBe.getMessage());
                 }
             }

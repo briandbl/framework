@@ -14,6 +14,7 @@ package org.freedesktop.dbus;
 import static org.freedesktop.dbus.Gettext._;
 
 import android.net.LocalSocketAddress;
+import android.util.Log;
 
 import java.lang.reflect.Proxy;
 
@@ -39,8 +40,6 @@ import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 import org.freedesktop.dbus.exceptions.NotConnected;
 
-import cx.ath.matthew.debug.Debug;
-
 /**
  * Handles a connection to DBus.
  * <p>
@@ -54,6 +53,30 @@ import cx.ath.matthew.debug.Debug;
  */
 public class DBusConnection extends AbstractConnection
 {
+    private static final String TAG = "DBus-Connection";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
     /**
      * Add addresses of peers to a set which will watch for them to disappear
      * and automatically remove them from the set.
@@ -68,13 +91,13 @@ public class DBusConnection extends AbstractConnection
             try {
                 addSigHandler(new DBusMatchRule(DBus.NameOwnerChanged.class, null, null), this);
             } catch (DBusException DBe) {
-                Debug.print(Debug.ERR, DBe);
+                debug(DBe);
             }
         }
 
         public void handle(DBus.NameOwnerChanged noc)
         {
-            Debug.print(Debug.DEBUG, "Received NameOwnerChanged(" + noc.name + "," + noc.old_owner
+            debug(DEBUG, "Received NameOwnerChanged(" + noc.name + "," + noc.old_owner
                     + "," + noc.new_owner + ")");
             if ("".equals(noc.new_owner) && addresses.contains(noc.name))
                 remove(noc.name);
@@ -82,8 +105,7 @@ public class DBusConnection extends AbstractConnection
 
         public boolean add(String address)
         {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Adding " + address);
+            debug(DEBUG, "Adding " + address);
             synchronized (addresses) {
                 return addresses.add(address);
             }
@@ -138,8 +160,8 @@ public class DBusConnection extends AbstractConnection
 
         public boolean remove(Object o)
         {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Removing " + o);
+
+            debug(DEBUG, "Removing " + o);
             synchronized (addresses) {
                 return addresses.remove(o);
             }
@@ -184,13 +206,13 @@ public class DBusConnection extends AbstractConnection
         public void handle(DBusSignal s)
         {
             if (s instanceof org.freedesktop.DBus.Local.Disconnected) {
-                if (Debug.debug)
-                    Debug.print(Debug.WARN, "Handling Disconnected signal from bus");
+
+                debug(WARN, "Handling Disconnected signal from bus");
                 try {
                     Error err = new Error(
                             "org.freedesktop.DBus.Local",
                             "org.freedesktop.DBus.Local.Disconnected", 0, "s", new Object[] {
-                                _("Disconnected")
+                                    _("Disconnected")
                             });
                     if (null != pendingCalls)
                         synchronized (pendingCalls) {
@@ -280,8 +302,8 @@ public class DBusConnection extends AbstractConnection
                     throw new DBusException(_("Invalid Bus Type: ") + bustype);
             }
             DBusConnection c = conn.get(s);
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE, "Getting bus connection for " + s + ": " + c);
+
+            debug(VERBOSE, "Getting bus connection for " + s + ": " + c);
             if (null != c) {
                 synchronized (c._reflock) {
                     c._refcount++;
@@ -289,8 +311,8 @@ public class DBusConnection extends AbstractConnection
                 return c;
             }
             else {
-                if (Debug.debug)
-                    Debug.print(Debug.DEBUG, "Creating new bus connection to: " + s);
+
+                debug(DEBUG, "Creating new bus connection to: " + s);
                 c = new DBusConnection(s);
                 conn.put(s, c);
                 return c;
@@ -318,8 +340,8 @@ public class DBusConnection extends AbstractConnection
             transport = new Transport(addr, AbstractConnection.TIMEOUT);
             connected = true;
         } catch (Exception IOe) {
-            if (EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, IOe);
+
+            debug(IOe);
             disconnect();
             throw new DBusException(_("Failed to connect to bus ") + IOe.getMessage());
         }
@@ -337,7 +359,7 @@ public class DBusConnection extends AbstractConnection
         try {
             busnames.add(_dbus.Hello());
         } catch (DBusExecutionException DBEe) {
-            Debug.print(Debug.ERR, DBEe);
+            debug(DBEe);
             throw new DBusException(DBEe.getMessage());
         }
     }
@@ -345,14 +367,14 @@ public class DBusConnection extends AbstractConnection
     @SuppressWarnings("unchecked")
     DBusInterface dynamicProxy(String source, String path) throws DBusException
     {
-        if (Debug.debug)
-            Debug.print(Debug.INFO, "Introspecting " + path + " on " + source
-                    + " for dynamic proxy creation");
+
+        debug(INFO, "Introspecting " + path + " on " + source
+                + " for dynamic proxy creation");
         try {
             DBus.Introspectable intro = getRemoteObject(source, path, DBus.Introspectable.class);
             String data = intro.Introspect();
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE, "Got introspection data: " + data);
+
+            debug(VERBOSE, "Got introspection data: " + data);
             String[] tags = data.split("[<>]");
             Vector<String> ifaces = new Vector<String>();
             for (String tag : tags) {
@@ -362,8 +384,8 @@ public class DBusConnection extends AbstractConnection
             }
             Vector<Class<? extends Object>> ifcs = new Vector<Class<? extends Object>>();
             for (String iface : ifaces) {
-                if (Debug.debug)
-                    Debug.print(Debug.DEBUG, "Trying interface " + iface);
+
+                debug(DEBUG, "Trying interface " + iface);
                 int j = 0;
                 while (j >= 0) {
                     try {
@@ -393,8 +415,8 @@ public class DBusConnection extends AbstractConnection
             importedObjects.put(newi, ro);
             return newi;
         } catch (Exception e) {
-            if (EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, e);
+
+            debug(e);
             throw new DBusException(MessageFormat.format(
                     _("Failed to create proxy object for {0} exported by {1}. Reason: {2}"),
                     new Object[] {
@@ -437,8 +459,8 @@ public class DBusConnection extends AbstractConnection
             try {
                 rv = _dbus.ReleaseName(busname);
             } catch (DBusExecutionException DBEe) {
-                if (EXCEPTION_DEBUG && Debug.debug)
-                    Debug.print(Debug.ERR, DBEe);
+
+                debug(DBEe);
                 throw new DBusException(DBEe.getMessage());
             }
             this.busnames.remove(busname);
@@ -465,8 +487,8 @@ public class DBusConnection extends AbstractConnection
                         new UInt32(DBus.DBUS_NAME_FLAG_REPLACE_EXISTING |
                                 DBus.DBUS_NAME_FLAG_DO_NOT_QUEUE));
             } catch (DBusExecutionException DBEe) {
-                if (EXCEPTION_DEBUG && Debug.debug)
-                    Debug.print(Debug.ERR, DBEe);
+
+                debug(DBEe);
                 throw new DBusException(DBEe.getMessage());
             }
             switch (rv.intValue()) {
@@ -771,11 +793,11 @@ public class DBusConnection extends AbstractConnection
                     try {
                         _dbus.RemoveMatch(rule.toString());
                     } catch (NotConnected NC) {
-                        if (EXCEPTION_DEBUG && Debug.debug)
-                            Debug.print(Debug.ERR, NC);
+
+                        debug(NC);
                     } catch (DBusExecutionException DBEe) {
-                        if (EXCEPTION_DEBUG && Debug.debug)
-                            Debug.print(Debug.ERR, DBEe);
+
+                        debug(DBEe);
                         throw new DBusException(DBEe.getMessage());
                     }
                 }
@@ -845,8 +867,7 @@ public class DBusConnection extends AbstractConnection
         try {
             _dbus.AddMatch(rule.toString());
         } catch (DBusExecutionException DBEe) {
-            if (EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, DBEe);
+            debug(DBEe);
             throw new DBusException(DBEe.getMessage());
         }
         SignalTuple key = new SignalTuple(rule.getInterface(), rule.getMember(), rule.getObject(),
@@ -871,14 +892,13 @@ public class DBusConnection extends AbstractConnection
         synchronized (conn) {
             synchronized (_reflock) {
                 if (0 == --_refcount) {
-                    if (Debug.debug)
-                        Debug.print(Debug.INFO, "Disconnecting DBusConnection");
+                    debug(INFO, "Disconnecting DBusConnection");
                     // Set all pending messages to have an error.
                     try {
                         Error err = new Error(
                                 "org.freedesktop.DBus.Local",
                                 "org.freedesktop.DBus.Local.Disconnected", 0, "s", new Object[] {
-                                    _("Disconnected")
+                                        _("Disconnected")
                                 });
                         synchronized (pendingCalls) {
                             long[] set = pendingCalls.getKeys();

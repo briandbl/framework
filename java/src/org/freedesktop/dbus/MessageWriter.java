@@ -11,15 +11,44 @@
 
 package org.freedesktop.dbus;
 
-import java.io.BufferedOutputStream;
-import java.io.OutputStream;
-import java.io.IOException;
+import android.util.Log;
 
-import cx.ath.matthew.debug.Debug;
 import cx.ath.matthew.utils.Hexdump;
+
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 
 public class MessageWriter
 {
+    private static final String TAG="DBus-MW";
+    
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL=INFO;
+    
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o){
+        Log.e(TAG, "error", o);
+    } 
+    
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o){
+        if (l>=LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+    
+    @SuppressWarnings("unused")
+    private static void debug(Object o){
+        debug(DEBUG, o);
+    }
     private OutputStream out;
     private boolean isunix;
 
@@ -33,19 +62,15 @@ public class MessageWriter
 
     public void writeMessage(Message m) throws IOException
     {
-        if (Debug.debug) {
-            Debug.print(Debug.INFO, "<= " + m);
-        }
+        debug(INFO, "<= " + m);
         if (null == m)
             return;
         if (null == m.getWireData()) {
-            if (Debug.debug)
-                Debug.print(Debug.WARN, "Message " + m + " wire-data was null!");
+            debug(WARN, "Message " + m + " wire-data was null!");
             return;
         }
         for (byte[] buf : m.getWireData()) {
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE,
+            debug(VERBOSE,
                         "(" + buf + "):" + (null == buf ? "" : Hexdump.format(buf)));
             if (null == buf)
                 break;
@@ -56,8 +81,7 @@ public class MessageWriter
 
     public void close() throws IOException
     {
-        if (Debug.debug)
-            Debug.print(Debug.INFO, "Closing Message Writer");
+        debug(INFO, "Closing Message Writer");
         out.close();
     }
 }

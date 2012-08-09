@@ -11,7 +11,7 @@
 
 package org.freedesktop.dbus;
 
-import cx.ath.matthew.debug.Debug;
+import android.util.Log;
 
 import java.util.regex.Pattern;
 
@@ -20,6 +20,35 @@ import java.util.regex.Pattern;
  */
 class ObjectTree
 {
+    private static final String TAG = "DBus-OT";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(Object o) {
+        debug(DEBUG, o);
+    }
+
     class TreeNode
     {
         String name;
@@ -121,15 +150,15 @@ class ObjectTree
 
     public void add(String path, ExportedObject object, String data)
     {
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Adding " + path + " to object tree");
+
+        debug(DEBUG, "Adding " + path + " to object tree");
         root = recursiveAdd(root, path, object, data);
     }
 
     public void remove(String path)
     {
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Removing " + path + " from object tree");
+
+        debug(DEBUG, "Removing " + path + " from object tree");
         TreeNode t = recursiveFind(root, path);
         t.object = null;
         t.data = null;

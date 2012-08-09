@@ -13,6 +13,9 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
+import android.os.Debug;
+import android.util.Log;
+
 import java.lang.reflect.Array;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -20,10 +23,32 @@ import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.List;
 
-import cx.ath.matthew.debug.Debug;
-
 class ArrayFrob
 {
+    private static final String TAG = "DBus-ArrayFrob";
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL=INFO;
+    
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o){
+        Log.e(TAG, "error", o);
+    }
+    
+    
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o){
+        if (l>=LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }  
+    
     static Hashtable<Class<? extends Object>, Class<? extends Object>> primitiveToWrapper = new Hashtable<Class<? extends Object>, Class<? extends Object>>();
     static Hashtable<Class<? extends Object>, Class<? extends Object>> wrapperToPrimitive = new Hashtable<Class<? extends Object>, Class<? extends Object>>();
     static {
@@ -165,7 +190,7 @@ class ArrayFrob
                 return type((Object[]) o, (Class<Object>) c.getComponentType());
 
         } catch (Exception e) {
-            Debug.print(Debug.ERR, e);
+            debug(e);
             throw new IllegalArgumentException(e);
         }
 

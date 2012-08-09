@@ -13,12 +13,13 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
+import android.util.Log;
+
+import org.freedesktop.dbus.exceptions.DBusException;
+
 import java.lang.reflect.Type;
 import java.text.MessageFormat;
 import java.util.Vector;
-import org.freedesktop.dbus.exceptions.DBusException;
-
-import cx.ath.matthew.debug.Debug;
 
 /**
  * A Wrapper class for Variant values. A method on DBus can send or receive a
@@ -27,6 +28,35 @@ import cx.ath.matthew.debug.Debug;
  */
 public class Variant<T>
 {
+    private static final String TAG = "DBus-VR";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(Object o) {
+        debug(DEBUG, o);
+    }
+
     private final T o;
     private final Type type;
     private final String sig;
@@ -50,8 +80,7 @@ public class Variant<T>
                         _("Can't wrap a multi-valued type in a Variant: ") + type);
             this.sig = ss[0];
         } catch (DBusException DBe) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, DBe);
+            debug(DBe);
             throw new IllegalArgumentException(MessageFormat.format(
                     _("Can't wrap {0} in an unqualified Variant ({1})."), new Object[] {
                             o.getClass(), DBe.getMessage()
@@ -80,8 +109,7 @@ public class Variant<T>
                         _("Can't wrap a multi-valued type in a Variant: ") + type);
             this.sig = ss[0];
         } catch (DBusException DBe) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, DBe);
+            debug(DBe);
             throw new IllegalArgumentException(MessageFormat.format(
                     _("Can't wrap {0} in an unqualified Variant ({1})."), new Object[] {
                             type, DBe.getMessage()
@@ -111,8 +139,7 @@ public class Variant<T>
                         _("Can't wrap multiple or no types in a Variant: ") + sig);
             this.type = ts.get(0);
         } catch (DBusException DBe) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, DBe);
+            debug(DBe);
             throw new IllegalArgumentException(MessageFormat.format(
                     _("Can't wrap {0} in an unqualified Variant ({1})."), new Object[] {
                             sig, DBe.getMessage()

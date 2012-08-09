@@ -13,22 +13,52 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
-import java.io.BufferedInputStream;
-import java.io.EOFException;
-import java.io.InputStream;
-import java.io.IOException;
-import java.net.SocketTimeoutException;
-import java.text.MessageFormat;
+import android.util.Log;
 
-import cx.ath.matthew.debug.Debug;
 import cx.ath.matthew.utils.Hexdump;
 
 import org.freedesktop.dbus.exceptions.DBusException;
-import org.freedesktop.dbus.exceptions.MessageTypeException;
 import org.freedesktop.dbus.exceptions.MessageProtocolVersionException;
+import org.freedesktop.dbus.exceptions.MessageTypeException;
+
+import java.io.BufferedInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.SocketTimeoutException;
+import java.text.MessageFormat;
 
 public class MessageReader
 {
+    private static final String TAG = "DBus-MR";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(Object o) {
+        debug(DEBUG, o);
+    }
+
     private InputStream in;
     private byte[] buf = null;
     private byte[] tbuf = null;
@@ -62,8 +92,8 @@ public class MessageReader
         if (len[0] == 0)
             return null;
         if (len[0] < 12) {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Only got " + len[0] + " of 12 bytes of header");
+
+            debug(DEBUG, "Only got " + len[0] + " of 12 bytes of header");
             return null;
         }
 
@@ -95,8 +125,8 @@ public class MessageReader
             len[1] += rv;
         }
         if (len[1] < 4) {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Only got " + len[1] + " of 4 bytes of header");
+
+            debug(DEBUG, "Only got " + len[1] + " of 4 bytes of header");
             return null;
         }
 
@@ -126,9 +156,9 @@ public class MessageReader
             len[2] += rv;
         }
         if (len[2] < headerlen) {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Only got " + len[2] + " of " + headerlen
-                        + " bytes of header");
+
+            debug(DEBUG, "Only got " + len[2] + " of " + headerlen
+                    + " bytes of header");
             return null;
         }
 
@@ -151,9 +181,9 @@ public class MessageReader
             len[3] += rv;
         }
         if (len[3] < body.length) {
-            if (Debug.debug)
-                Debug.print(Debug.DEBUG, "Only got " + len[3] + " of " + body.length
-                        + " bytes of body");
+
+            debug(DEBUG, "Only got " + len[3] + " of " + body.length
+                    + " bytes of body");
             return null;
         }
 
@@ -177,33 +207,31 @@ public class MessageReader
                             type
                         }));
         }
-        if (Debug.debug) {
-            Debug.print(Debug.VERBOSE, Hexdump.format(buf));
-            Debug.print(Debug.VERBOSE, Hexdump.format(tbuf));
-            Debug.print(Debug.VERBOSE, Hexdump.format(header));
-            Debug.print(Debug.VERBOSE, Hexdump.format(body));
+        {
+            debug(VERBOSE, Hexdump.format(buf));
+            debug(VERBOSE, Hexdump.format(tbuf));
+            debug(VERBOSE, Hexdump.format(header));
+            debug(VERBOSE, Hexdump.format(body));
         }
         try {
             m.populate(buf, header, body);
         } catch (DBusException DBe) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, DBe);
+            debug(DBe);
             buf = null;
             tbuf = null;
             body = null;
             header = null;
             throw DBe;
         } catch (RuntimeException Re) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, Re);
+            debug(Re);
             buf = null;
             tbuf = null;
             body = null;
             header = null;
             throw Re;
         }
-        if (Debug.debug) {
-            Debug.print(Debug.INFO, "=> " + m);
+        {
+            debug(INFO, "=> " + m);
         }
         buf = null;
         tbuf = null;
@@ -214,8 +242,8 @@ public class MessageReader
 
     public void close() throws IOException
     {
-        if (Debug.debug)
-            Debug.print(Debug.INFO, "Closing Message Reader");
+
+        debug(INFO, "Closing Message Reader");
         in.close();
     }
 }

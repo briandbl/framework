@@ -11,13 +11,30 @@
 
 package org.freedesktop.dbus;
 
-import cx.ath.matthew.debug.Debug;
+import android.util.Log;
 
 /**
  * Provides a Message queue which doesn't allocate objects on insertion/removal.
  */
 class EfficientQueue
 {
+    private static String TAG="DBus-EfficientQueue";
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL=INFO;
+    
+    private void debug(int l, Object o){
+        if (l>=LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }   
+    
     private Message[] mv;
     private int start;
     private int end;
@@ -31,8 +48,7 @@ class EfficientQueue
 
     private void grow()
     {
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Growing");
+        debug(Log.DEBUG, "Growing");
         // create new vectors twice as long
         Message[] oldmv = mv;
         mv = new Message[oldmv.length * 2];
@@ -69,8 +85,7 @@ class EfficientQueue
 
     private void shrink()
     {
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Shrinking");
+        debug(DEBUG, "Shrinking");
         if (null != mv && mv.length == init_size)
             return;
         // reset to original size
@@ -81,8 +96,7 @@ class EfficientQueue
 
     public void add(Message m)
     {
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Enqueueing Message " + m);
+        debug(DEBUG, "Enqueueing Message " + m);
         // put this at the end
         mv[end] = m;
         // move the end
@@ -109,8 +123,7 @@ class EfficientQueue
             start = 0;
         else
             start++;
-        if (Debug.debug)
-            Debug.print(Debug.DEBUG, "Dequeueing " + m);
+        debug(DEBUG, "Dequeueing " + m);
         return m;
     }
 

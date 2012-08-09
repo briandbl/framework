@@ -13,6 +13,13 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
+import android.util.Log;
+
+import org.freedesktop.DBus;
+import org.freedesktop.dbus.exceptions.DBusException;
+import org.freedesktop.dbus.exceptions.DBusExecutionException;
+import org.freedesktop.dbus.exceptions.NotConnected;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -21,15 +28,37 @@ import java.lang.reflect.Type;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.freedesktop.DBus;
-import org.freedesktop.dbus.exceptions.DBusException;
-import org.freedesktop.dbus.exceptions.DBusExecutionException;
-import org.freedesktop.dbus.exceptions.NotConnected;
-
-import cx.ath.matthew.debug.Debug;
-
 class RemoteInvocationHandler implements InvocationHandler
 {
+    private static final String TAG = "DBus-RIH";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(Object o) {
+        debug(DEBUG, o);
+    }
+
     public static final int CALL_TYPE_SYNC = 0;
     public static final int CALL_TYPE_ASYNC = 1;
     public static final int CALL_TYPE_CALLBACK = 2;
@@ -47,17 +76,17 @@ class RemoteInvocationHandler implements InvocationHandler
                         _("Wrong return type (got void, expected a value)"));
         } else {
             try {
-                if (Debug.debug)
-                    Debug.print(Debug.VERBOSE,
-                            "Converting return parameters from " + Arrays.deepToString(rp)
-                                    + " to type " + m.getGenericReturnType());
+
+                debug(VERBOSE,
+                        "Converting return parameters from " + Arrays.deepToString(rp)
+                                + " to type " + m.getGenericReturnType());
                 rp = Marshalling.deSerializeParameters(rp,
                         new Type[] {
                             m.getGenericReturnType()
                         }, conn);
             } catch (Exception e) {
-                if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                    Debug.print(Debug.ERR, e);
+
+                debug(e);
                 throw new DBusExecutionException(MessageFormat.format(
                         _("Wrong return type (failed to de-serialize correct types: {0} )"),
                         new Object[] {
@@ -85,8 +114,7 @@ class RemoteInvocationHandler implements InvocationHandler
                 try {
                     return cons.newInstance(rp);
                 } catch (Exception e) {
-                    if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                        Debug.print(Debug.ERR, e);
+                    debug(e);
                     throw new DBusException(e.getMessage());
                 }
         }
@@ -132,8 +160,7 @@ class RemoteInvocationHandler implements InvocationHandler
                                     .replaceAll("."), name, flags, sig, args);
             }
         } catch (DBusException DBe) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, DBe);
+            debug(DBe);
             throw new DBusExecutionException(_("Failed to construct outgoing method call: ")
                     + DBe.getMessage());
         }
@@ -146,8 +173,8 @@ class RemoteInvocationHandler implements InvocationHandler
                 return new DBusAsyncReply(call, m, conn);
             case CALL_TYPE_CALLBACK:
                 synchronized (conn.pendingCallbacks) {
-                    if (Debug.debug)
-                        Debug.print(Debug.VERBOSE, "Queueing Callback " + callback + " for " + call);
+
+                    debug(VERBOSE, "Queueing Callback " + callback + " for " + call);
                     conn.pendingCallbacks.put(call, callback);
                     conn.pendingCallbackReplys.put(call, new DBusAsyncReply(call, m, conn));
                 }
@@ -172,8 +199,7 @@ class RemoteInvocationHandler implements InvocationHandler
         try {
             return convertRV(reply.getSig(), reply.getParameters(), m, conn);
         } catch (DBusException e) {
-            if (AbstractConnection.EXCEPTION_DEBUG && Debug.debug)
-                Debug.print(Debug.ERR, e);
+            debug(e);
             throw new DBusExecutionException(e.getMessage());
         }
     }

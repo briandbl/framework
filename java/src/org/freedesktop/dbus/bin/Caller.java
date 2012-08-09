@@ -12,17 +12,16 @@ package org.freedesktop.dbus.bin;
 
 import android.net.LocalSocketAddress;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Type;
-import java.util.Arrays;
-import java.util.Vector;
-import java.io.File;
 import org.freedesktop.dbus.Error;
 import org.freedesktop.dbus.Marshalling;
 import org.freedesktop.dbus.Message;
 import org.freedesktop.dbus.MethodCall;
 import org.freedesktop.dbus.Transport;
-import cx.ath.matthew.debug.Debug;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.Vector;
 
 public class Caller
 {
@@ -30,10 +29,6 @@ public class Caller
    public static void main(String[] args) 
    {
       try { 
-         if (Debug.debug) {
-            Debug.setHexDump(true);
-            Debug.loadConfig(new File("debug.conf"));
-         }
          if (args.length < 4)  {
             System.out.println ("Syntax: Caller <dest> <path> <interface> <method> [<sig> <args>]");
             System.exit(1);

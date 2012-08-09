@@ -10,6 +10,8 @@
 */
 package org.freedesktop.dbus.test;
 
+import android.util.Log;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -38,7 +40,6 @@ import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 import org.freedesktop.dbus.types.DBusMapType;
 
-import cx.ath.matthew.debug.Debug;
 
 public class cross_test_client implements DBus.Binding.TestClient, DBusSigHandler<DBus.Binding.TestSignals.Triggered>
 {
@@ -249,7 +250,7 @@ public class cross_test_client implements DBus.Binding.TestClient, DBusSigHandle
             fail("org.freedesktop.DBus.Binding.Tests.Primitize", "Wrong Return Value; expected "+collapseArray(vs)+" got "+collapseArray(res));
 
       } catch (Exception e) {
-         if (Debug.debug) Debug.print(e);
+         Log.e(e);
          fail("org.freedesktop.DBus.Binding.Tests.Primitize", "Exception occurred during test: ("+e.getClass().getName()+") "+e.getMessage());
       }
    }
