@@ -82,8 +82,8 @@ public interface Adapter extends DBusInterface{
      */
     @SuppressWarnings("rawtypes")
     public class PropertyChanged extends DBusSignal {
-        String name;
-        Variant value;
+        public String name;
+        public Variant value;
            
         public PropertyChanged(String path, String name, Variant value) 
                 throws DBusException{
@@ -95,8 +95,8 @@ public interface Adapter extends DBusInterface{
     
     @SuppressWarnings("rawtypes")
     public class DeviceFound extends DBusSignal {
-        String address;
-        Map<String, Variant> values;
+        public String address;
+        public Map<String, Variant> values;
         
         public DeviceFound(String path, String address, 
                     Map<String, Variant> values) throws DBusException{
@@ -107,7 +107,7 @@ public interface Adapter extends DBusInterface{
     }
     
     public class DeviceDisappeared extends DBusSignal {
-        String address;
+        public String address;
         
         public DeviceDisappeared(String path, String address) 
                 throws DBusException{
@@ -117,7 +117,7 @@ public interface Adapter extends DBusInterface{
     }
     
     public class DeviceCreated extends DBusSignal {
-        Path device;
+        public Path device;
         
         public DeviceCreated(String path, Path device) 
                 throws DBusException{
@@ -127,7 +127,7 @@ public interface Adapter extends DBusInterface{
     }
     
     public class DeviceRemoved extends DBusSignal {
-        Path device;
+        public Path device;
         
         public DeviceRemoved(String path, Path device) 
                 throws DBusException{

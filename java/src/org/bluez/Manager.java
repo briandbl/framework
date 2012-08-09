@@ -32,10 +32,10 @@ public interface Manager extends DBusInterface{
             Error.DoesNotExist, Error.InvalidArguments;
 
     
-    public String DefaultAdapter() throws
+    public Path DefaultAdapter() throws
             Error.InvalidArguments, Error.NoSuchAdapter;
     
-    public String FindAdapter(String pattern) throws
+    public Path FindAdapter(String pattern) throws
             Error.InvalidArguments, Error.NoSuchAdapter;
     
     /*
@@ -44,8 +44,8 @@ public interface Manager extends DBusInterface{
     
     @SuppressWarnings("rawtypes")
     public class PropertyChanged extends DBusSignal {
-        String name;
-        Variant value;
+        public String name;
+        public Variant value;
            
         public PropertyChanged(String path, String name, Variant value) 
                 throws DBusException{
