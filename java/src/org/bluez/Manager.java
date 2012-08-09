@@ -1,7 +1,10 @@
 package org.bluez;
 
 import org.freedesktop.dbus.DBusInterface;
+import org.freedesktop.dbus.DBusSignal;
+import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
+import org.freedesktop.dbus.exceptions.DBusException;
 
 import java.util.Map;
 
@@ -24,13 +27,44 @@ public interface Manager extends DBusInterface{
     /*
      * Signals from manager-api.txt
      */
-    Signals     PropertyChanged(string name, variant value)
-                AdapterAdded(object adapter)
-                AdapterRemoved(object adapter)
-                DefaultAdapterChanged(object adapter)
+    public class PropertyChanged<T> extends DBusSignal {
+        String name;
+        Variant<T> value;
+           
+        public PropertyChanged(String path, String name, Variant<T> value) throws DBusException{
+            super(path, name, value);
+            this.name = name;
+            this.value = value;
+        }
+    }
     
-    /*
-     * Properties from manager-api.txt
-     */
-    Properties
+    public class AdapterAdded extends DBusSignal {
+        Path value;
+        
+        
+        public AdapterAdded(String path, Path value) throws DBusException{
+            super(path, value);
+            this.value = value;
+        }
+    }
+    
+    public class AdapterRemoved extends DBusSignal {
+        Path value;
+        
+        
+        public AdapterRemoved(String path, Path value) throws DBusException{
+            super(path, value);
+            this.value = value;
+        }
+    }    
+
+    public class DefaultAdapterChanged extends DBusSignal {
+        Path value;
+        
+        
+        public DefaultAdapterChanged(String path, Path value) throws DBusException{
+            super(path, value);
+            this.value = value;
+        }
+    } 
 }
