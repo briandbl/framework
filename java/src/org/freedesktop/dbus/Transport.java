@@ -698,15 +698,6 @@ public class Transport
     public Transport() {
     }
 
-    public static String genGUID()
-    {
-        Random r = new Random();
-        byte[] buf = new byte[16];
-        r.nextBytes(buf);
-        String guid = Hexdump.toHex(buf);
-        return guid.replaceAll(" ", "");
-    }
-
     public Transport(LocalSocketAddress address) throws IOException
     {
         connect(address, 0);

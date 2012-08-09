@@ -93,54 +93,6 @@ public class DirectConnection extends AbstractConnection
         listen();
     }
 
-    /**
-     * Creates a bus address for a randomly generated tcp port.
-     * 
-     * @return a random bus address.
-     */
-    public static String createDynamicTCPSession()
-    {
-        String address = "tcp:host=localhost";
-        int port;
-        try {
-            ServerSocket s = new ServerSocket();
-            s.bind(null);
-            port = s.getLocalPort();
-            s.close();
-        } catch (Exception e) {
-            Random r = new Random();
-            port = 32768 + (Math.abs(r.nextInt()) % 28232);
-        }
-        address += ",port=" + port;
-        address += ",guid=" + Transport.genGUID();
-
-        debug(DEBUG, "Created Session address: " + address);
-        return address;
-    }
-
-    /**
-     * Creates a bus address for a randomly generated abstract unix socket.
-     * 
-     * @return a random bus address.
-     */
-    public static String createDynamicSession()
-    {
-        String address = "unix:";
-        String path = "/tmp/dbus-XXXXXXXXXX";
-        Random r = new Random();
-        do {
-            StringBuffer sb = new StringBuffer();
-            for (int i = 0; i < 10; i++)
-                sb.append((char) ((Math.abs(r.nextInt()) % 26) + 65));
-            path = path.replaceAll("..........$", sb.toString());
-            debug(VERBOSE, "Trying path " + path);
-        } while ((new File(path)).exists());
-        address += "abstract=" + path;
-        address += ",guid=" + Transport.genGUID();
-        debug("Created Session address: " + address);
-        return address;
-    }
-
     DBusInterface dynamicProxy(String path) throws DBusException
     {
         try {
