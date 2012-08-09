@@ -22,7 +22,7 @@ LOCAL_SRC_FILES := \
 	java/src/android/server/le/BluetoothLEService.java \
 	java/src/android/bluetooth/le/IBluetoothLE.aidl \
 	java/src/org/bluez/Adapter.java \
-	java/src/org/bluez/Characteristic.java \
+	java/src/org/bluez/Characeteristic.java \
 	java/src/org/bluez/Device.java \
 	java/src/org/bluez/Error.java \
 	java/src/org/bluez/Manager.java \
@@ -119,11 +119,20 @@ include $(BUILD_JAVA_LIBRARY)
 
 framework_built := $(call java-lib-deps,btle-framework)
 
-# Include subdirectory makefiles
-# ============================================================
+include $(CLEAR_VARS)
 
-# If we're building with ONE_SHOT_MAKEFILE (mm, mmm), then what the framework
-# team really wants is to build the stuff defined by this makefile.
-ifeq (,$(ONE_SHOT_MAKEFILE))
-include $(call first-makefiles-under,$(LOCAL_PATH))
-endif
+LOCAL_SRC_FILES := \
+	java/src/android/server/le/test/TestManager.java
+
+LOCAL_NO_STANDARD_LIBRARIES := true
+LOCAL_JAVA_LIBRARIES := bouncycastle core core-junit ext framework btle-framework
+
+LOCAL_MODULE := btle-test-manager
+LOCAL_MODULE_CLASS := JAVA_LIBRARIES
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_NO_EMMA_INSTRUMENT := true
+LOCAL_NO_EMMA_COMPILE := true
+
+include $(BUILD_JAVA_LIBRARY)
+
