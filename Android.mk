@@ -20,7 +20,73 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
 	java/src/android/bluetooth/le/BluetoothAdapterLE.java \
 	java/src/android/server/le/BluetoothLEService.java \
-	java/src/android/bluetooth/le/IBluetoothLE.aidl
+	java/src/android/bluetooth/le/IBluetoothLE.aidl \
+	java/src/android/server/le/dbus/IAdapter.java \
+	java/src/android/server/le/dbus/IManager.java \
+	java/src/android/server/le/dbus/Errors.java \
+	java/src/cx/ath/matthew/utils/Hexdump.java \
+	java/src/org/freedesktop/dbus/Struct.java \
+	java/src/org/freedesktop/dbus/Path.java \
+	java/src/org/freedesktop/dbus/UInt32.java \
+	java/src/org/freedesktop/dbus/Tuple.java \
+	java/src/org/freedesktop/dbus/RemoteInvocationHandler.java \
+	java/src/org/freedesktop/dbus/InternalSignal.java \
+	java/src/org/freedesktop/dbus/DBusConnection.java \
+	java/src/org/freedesktop/dbus/Position.java \
+	java/src/org/freedesktop/dbus/Transport.java \
+	java/src/org/freedesktop/dbus/AbstractConnection.java \
+	java/src/org/freedesktop/dbus/Variant.java \
+	java/src/org/freedesktop/dbus/MethodTuple.java \
+	java/src/org/freedesktop/dbus/MethodCall.java \
+	java/src/org/freedesktop/dbus/SignalTuple.java \
+	java/src/org/freedesktop/dbus/ArrayFrob.java \
+	java/src/org/freedesktop/dbus/RemoteObject.java \
+	java/src/org/freedesktop/dbus/DBusAsyncReply.java \
+	java/src/org/freedesktop/dbus/MessageWriter.java \
+	java/src/org/freedesktop/dbus/CallbackHandler.java \
+	java/src/org/freedesktop/dbus/ObjectTree.java \
+	java/src/org/freedesktop/dbus/UInt64.java \
+	java/src/org/freedesktop/dbus/ExportedObject.java \
+	java/src/org/freedesktop/dbus/DBusSignal.java \
+	java/src/org/freedesktop/dbus/DBusMap.java \
+	java/src/org/freedesktop/dbus/Container.java \
+	java/src/org/freedesktop/dbus/ObjectPath.java \
+	java/src/org/freedesktop/dbus/DBusMemberName.java \
+	java/src/org/freedesktop/dbus/DirectConnection.java \
+	java/src/org/freedesktop/dbus/DBusInterface.java \
+	java/src/org/freedesktop/dbus/DBusSerializable.java \
+	java/src/org/freedesktop/dbus/TypeSignature.java \
+	java/src/org/freedesktop/dbus/MessageReader.java \
+	java/src/org/freedesktop/dbus/Message.java \
+	java/src/org/freedesktop/dbus/DBusCallInfo.java \
+	java/src/org/freedesktop/dbus/types/DBusMapType.java \
+	java/src/org/freedesktop/dbus/types/DBusListType.java \
+	java/src/org/freedesktop/dbus/types/DBusStructType.java \
+	java/src/org/freedesktop/dbus/Error.java \
+	java/src/org/freedesktop/dbus/StrongReference.java \
+	java/src/org/freedesktop/dbus/exceptions/FatalDBusException.java \
+	java/src/org/freedesktop/dbus/exceptions/NotConnected.java \
+	java/src/org/freedesktop/dbus/exceptions/MessageProtocolVersionException.java \
+	java/src/org/freedesktop/dbus/exceptions/DBusExecutionException.java \
+	java/src/org/freedesktop/dbus/exceptions/UnknownTypeCodeException.java \
+	java/src/org/freedesktop/dbus/exceptions/MarshallingException.java \
+	java/src/org/freedesktop/dbus/exceptions/MessageFormatException.java \
+	java/src/org/freedesktop/dbus/exceptions/MessageTypeException.java \
+	java/src/org/freedesktop/dbus/exceptions/NonFatalException.java \
+	java/src/org/freedesktop/dbus/exceptions/DBusException.java \
+	java/src/org/freedesktop/dbus/exceptions/FatalException.java \
+	java/src/org/freedesktop/dbus/exceptions/InternalMessageException.java \
+	java/src/org/freedesktop/dbus/DBusMatchRule.java \
+	java/src/org/freedesktop/dbus/DBusInterfaceName.java \
+	java/src/org/freedesktop/dbus/MethodReturn.java \
+	java/src/org/freedesktop/dbus/UInt16.java \
+	java/src/org/freedesktop/dbus/Gettext.java \
+	java/src/org/freedesktop/dbus/Marshalling.java \
+	java/src/org/freedesktop/dbus/DBusSigHandler.java \
+	java/src/org/freedesktop/dbus/EfficientMap.java \
+	java/src/org/freedesktop/dbus/EfficientQueue.java \
+	java/src/org/freedesktop/DBus.java
+
 
 aidl_files := java/scr/android/bluetooth/le/IBluetoothLE.aidl
 #$(gen): PRIVATE_SRC_FILES := $(aidl_files)
@@ -57,4 +123,3 @@ framework_built := $(call java-lib-deps,btle-framework)
 ifeq (,$(ONE_SHOT_MAKEFILE))
 include $(call first-makefiles-under,$(LOCAL_PATH))
 endif
-
