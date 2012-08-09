@@ -13,39 +13,62 @@ package org.freedesktop.dbus;
 
 import static org.freedesktop.dbus.Gettext._;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.lang.reflect.Method;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.text.ParseException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.text.Collator;
-import java.util.Arrays;
-import java.util.Random;
-import java.util.Vector;
-
-import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.util.Log;
 
-import org.freedesktop.dbus.Message;
-
 import cx.ath.matthew.utils.Hexdump;
-import cx.ath.matthew.debug.Debug;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.lang.reflect.Method;
+import java.net.Socket;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.text.Collator;
+import java.text.ParseException;
+import java.util.Arrays;
+import java.util.Random;
+import java.util.Vector;
 
 public class Transport
 {
+    private static final String TAG = "DBus-Tr";
+
+    public static final int VERBOSE = Log.VERBOSE;
+    public static final int DEBUG = Log.DEBUG;
+    public static final int INFO = Log.INFO;
+    public static final int WARN = Log.WARN;
+    public static final int ERROR = Log.ERROR;
+    public static final int ASSERT = Log.ASSERT;
+    private static int LEVEL = INFO;
+
+    @SuppressWarnings("unused")
+    private static void debug(Throwable o) {
+        Log.e(TAG, "error", o);
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(int l, Object o) {
+        if (l >= LEVEL)
+            if (o != null)
+                Log.println(l, TAG, o.toString());
+            else
+                Log.println(l, TAG, "NULL");
+    }
+
+    @SuppressWarnings("unused")
+    private static void debug(Object o) {
+        debug(DEBUG, o);
+    }
+
     public static class SASL
     {
         public static class Command
@@ -62,47 +85,47 @@ public class Transport
             public Command(String s) throws IOException
             {
                 String[] ss = s.split(" ");
-                if (Debug.debug)
-                    Debug.print(Debug.VERBOSE, "Creating command from: " + Arrays.toString(ss));
-                if (0 == col.compare(ss[0], "OK")) {
+
+                debug(VERBOSE, "Creating command from: " + Arrays.toString(ss));
+                if (ss[0].compareTo("OK")==0) {
                     command = COMMAND_OK;
                     data = ss[1];
-                } else if (0 == col.compare(ss[0], "AUTH")) {
+                } else if (ss[0].compareTo("AUTH")==0) {
                     command = COMMAND_AUTH;
                     if (ss.length > 1) {
-                        if (0 == col.compare(ss[1], "EXTERNAL"))
+                        if (0 == ss[1].compareTo("EXTERNAL"))
                             mechs = AUTH_EXTERNAL;
-                        else if (0 == col.compare(ss[1], "DBUS_COOKIE_SHA1"))
+                        else if (0 == ss[1].compareTo("DBUS_COOKIE_SHA1"))
                             mechs = AUTH_SHA;
-                        else if (0 == col.compare(ss[1], "ANONYMOUS"))
+                        else if (0 == ss[1].compareTo("ANONYMOUS"))
                             mechs = AUTH_ANON;
                     }
                     if (ss.length > 2)
                         data = ss[2];
-                } else if (0 == col.compare(ss[0], "DATA")) {
+                } else if (0 == ss[0].compareTo("DATA")) {
                     command = COMMAND_DATA;
                     data = ss[1];
-                } else if (0 == col.compare(ss[0], "REJECTED")) {
+                } else if (0 == ss[0].compareTo("REJECTED")) {
                     command = COMMAND_REJECTED;
                     for (int i = 1; i < ss.length; i++)
-                        if (0 == col.compare(ss[i], "EXTERNAL"))
+                        if (0 == ss[i].compareTo("EXTERNAL"))
                             mechs |= AUTH_EXTERNAL;
-                        else if (0 == col.compare(ss[i], "DBUS_COOKIE_SHA1"))
+                        else if (0 == ss[i].compareTo("DBUS_COOKIE_SHA1"))
                             mechs |= AUTH_SHA;
-                        else if (0 == col.compare(ss[i], "ANONYMOUS"))
+                        else if (0 == ss[i].compareTo("ANONYMOUS"))
                             mechs |= AUTH_ANON;
-                } else if (0 == col.compare(ss[0], "BEGIN")) {
+                } else if (0 == ss[0].compareTo("BEGIN")) {
                     command = COMMAND_BEGIN;
-                } else if (0 == col.compare(ss[0], "CANCEL")) {
+                } else if (0 == ss[0].compareTo("CANCEL")) {
                     command = COMMAND_CANCEL;
-                } else if (0 == col.compare(ss[0], "ERROR")) {
+                } else if (0 == ss[0].compareTo("ERROR")) {
                     command = COMMAND_ERROR;
                     data = ss[1];
                 } else {
                     throw new IOException(_("Invalid Command ") + ss[0]);
                 }
-                if (Debug.debug)
-                    Debug.print(Debug.VERBOSE, "Created command: " + this);
+
+                debug(VERBOSE, "Created command: " + this);
             }
 
             public int getCommand() {
@@ -131,11 +154,6 @@ public class Transport
             }
         }
 
-        private static Collator col = Collator.getInstance();
-        static {
-            col.setDecomposition(Collator.FULL_DECOMPOSITION);
-            col.setStrength(Collator.PRIMARY);
-        }
         public static final int LOCK_TIMEOUT = 1000;
         public static final int NEW_KEY_TIMEOUT_SECONDS = 60 * 5;
         public static final int EXPIRE_KEYS_TIMEOUT_SECONDS = NEW_KEY_TIMEOUT_SECONDS + (60 * 2);
@@ -326,13 +344,12 @@ public class Transport
                         sb.append((char) c);
                 }
             }
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE, "received: " + sb);
+
+            debug(VERBOSE, "received: " + sb);
             try {
                 return new Command(sb.toString());
             } catch (Exception e) {
-                if (Debug.debug && AbstractConnection.EXCEPTION_DEBUG)
-                    Debug.print(Debug.ERR, e);
+                debug(e);
                 return new Command();
             }
         }
@@ -371,8 +388,8 @@ public class Transport
             }
             sb.append('\r');
             sb.append('\n');
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE, "sending: " + sb);
+
+            debug(VERBOSE, "sending: " + sb);
             out.write(sb.toString().getBytes());
         }
 
@@ -381,11 +398,11 @@ public class Transport
             switch (auth) {
                 case AUTH_SHA:
                     String[] reply = stupidlyDecode(c.getData()).split(" ");
-                    if (Debug.debug)
-                        Debug.print(Debug.VERBOSE, Arrays.toString(reply));
+
+                    debug(VERBOSE, Arrays.toString(reply));
                     if (3 != reply.length) {
-                        if (Debug.debug)
-                            Debug.print(Debug.DEBUG, "Reply is not length 3");
+
+                        debug(DEBUG, "Reply is not length 3");
                         return ERROR;
                     }
                     String context = reply[0];
@@ -395,8 +412,7 @@ public class Transport
                     try {
                         md = MessageDigest.getInstance("SHA");
                     } catch (NoSuchAlgorithmException NSAe) {
-                        if (Debug.debug && AbstractConnection.EXCEPTION_DEBUG)
-                            Debug.print(Debug.ERR, NSAe);
+                        debug(NSAe);
                         return ERROR;
                     }
                     byte[] buf = new byte[8];
@@ -408,22 +424,22 @@ public class Transport
                     while (null == cookie && (System.currentTimeMillis() - start) < LOCK_TIMEOUT)
                         cookie = findCookie(context, ID);
                     if (null == cookie) {
-                        if (Debug.debug)
-                            Debug.print(Debug.DEBUG, "Did not find a cookie in context " + context
-                                    + " with ID " + ID);
+
+                        debug(DEBUG, "Did not find a cookie in context " + context
+                                + " with ID " + ID);
                         return ERROR;
                     }
                     String response = serverchallenge + ":" + clientchallenge + ":" + cookie;
                     buf = md.digest(response.getBytes());
-                    if (Debug.debug)
-                        Debug.print(Debug.VERBOSE,
-                                "Response: " + response + " hash: " + Hexdump.format(buf));
+
+                    debug(VERBOSE,
+                            "Response: " + response + " hash: " + Hexdump.format(buf));
                     response = stupidlyEncode(buf);
                     c.setResponse(stupidlyEncode(clientchallenge + " " + response));
                     return OK;
                 default:
-                    if (Debug.debug)
-                        Debug.print(Debug.DEBUG, "Not DBUS_COOKIE_SHA1 authtype.");
+
+                    debug(DEBUG, "Not DBUS_COOKIE_SHA1 authtype.");
                     return ERROR;
             }
         }
@@ -437,8 +453,7 @@ public class Transport
             try {
                 md = MessageDigest.getInstance("SHA");
             } catch (NoSuchAlgorithmException NSAe) {
-                if (Debug.debug && AbstractConnection.EXCEPTION_DEBUG)
-                    Debug.print(Debug.ERR, NSAe);
+                debug(NSAe);
                 return ERROR;
             }
             switch (auth) {
@@ -447,8 +462,8 @@ public class Transport
                         case AUTH_ANON:
                             return OK;
                         case AUTH_EXTERNAL:
-                            if (0 == col.compare(Uid, c.getData()) &&
-                                    (null == kernelUid || 0 == col.compare(Uid, kernelUid)))
+                            if (0 == Uid.compareTo(c.getData()) &&
+                                    (null == kernelUid || 0 == Uid.compareTo(kernelUid)))
                                 return OK;
                             else
                                 return ERROR;
@@ -464,12 +479,11 @@ public class Transport
                             try {
                                 addCookie(context, "" + id, id / 1000, cookie);
                             } catch (IOException IOe) {
-                                if (Debug.debug && AbstractConnection.EXCEPTION_DEBUG)
-                                    Debug.print(Debug.ERR, IOe);
+                                debug(IOe);
                             }
-                            if (Debug.debug)
-                                Debug.print(Debug.DEBUG, "Sending challenge: " + context + ' ' + id
-                                        + ' ' + challenge);
+
+                            debug(DEBUG, "Sending challenge: " + context + ' ' + id
+                                    + ' ' + challenge);
                             c.setResponse(stupidlyEncode(context + ' ' + id + ' ' + challenge));
                             return CONTINUE;
                         default:
@@ -484,10 +498,10 @@ public class Transport
                     String prehash = challenge + ":" + cchal + ":" + cookie;
                     byte[] buf = md.digest(prehash.getBytes());
                     String posthash = stupidlyEncode(buf);
-                    if (Debug.debug)
-                        Debug.print(Debug.DEBUG, "Authenticating Hash; data=" + prehash
-                                + " remote hash=" + hash + " local hash=" + posthash);
-                    if (0 == col.compare(posthash, hash))
+
+                    debug(DEBUG, "Authenticating Hash; data=" + prehash
+                            + " remote hash=" + hash + " local hash=" + posthash);
+                    if (0 == posthash.compareTo(hash))
                         return OK;
                     else
                         return ERROR;
@@ -501,15 +515,15 @@ public class Transport
             switch (types) {
                 case AUTH_EXTERNAL:
                     return new String[] {
-                        "EXTERNAL"
+                            "EXTERNAL"
                     };
                 case AUTH_SHA:
                     return new String[] {
-                        "DBUS_COOKIE_SHA1"
+                            "DBUS_COOKIE_SHA1"
                     };
                 case AUTH_ANON:
                     return new String[] {
-                        "ANONYMOUS"
+                            "ANONYMOUS"
                     };
                 case AUTH_SHA + AUTH_EXTERNAL:
                     return new String[] {
@@ -539,39 +553,23 @@ public class Transport
          * failed.
          */
         @SuppressWarnings("unchecked")
-        public boolean auth(int mode, int types, String guid, OutputStream out,
+        public boolean auth(int mode, int types, OutputStream out,
                 InputStream in, LocalSocket us) throws IOException
         {
-            String username = System.getProperty("user.name");
-            String Uid = null;
-            String kernelUid = null;
-            try {
-                Class c = Class.forName("com.sun.security.auth.module.UnixSystem");
-                Method m = c.getMethod("getUid");
-                Object o = c.newInstance();
-                long uid = (Long) m.invoke(o);
-                Uid = stupidlyEncode("" + uid);
-            } catch (Exception e) {
-                Uid = stupidlyEncode(username);
-            }
+            String Uid = stupidlyEncode(""+0); // on Android only root allowed
             Command c;
             int failed = 0;
             int current = 0;
             int state = INITIAL_STATE;
 
             while (state != AUTHENTICATED && state != FAILED) {
-                if (Debug.debug)
-                    Debug.print(Debug.VERBOSE, "AUTH state: " + state);
+
+                debug(VERBOSE, "AUTH state: " + state);
                 switch (mode) {
                     case MODE_CLIENT:
                         switch (state) {
                             case INITIAL_STATE:
-                                if (null == us)
-                                    out.write(new byte[] {
-                                        0
-                                    });
-                                else
-                                    throw new RuntimeException("not supported on Android");
+                                out.write(new byte[] { 0 });
                                 send(out, COMMAND_AUTH);
                                 state = WAIT_DATA;
                                 break;
@@ -746,8 +744,8 @@ public class Transport
 
     public void connect(LocalSocketAddress address, int timeout) throws IOException
     {
-        if (Debug.debug)
-            Debug.print(Debug.INFO, "Connecting to " + address);
+
+        debug(INFO, "Connecting to " + address);
         OutputStream out = null;
         InputStream in = null;
         LocalSocket us = null;
@@ -763,22 +761,21 @@ public class Transport
         in = us.getInputStream();
         out = us.getOutputStream();
 
-        // if (!(new SASL()).auth(mode, types, address.getParameter("guid"),
-        // out, in, us)) {
-        // out.close();
-        // throw new IOException(_("Failed to auth"));
-        // }
+        if (!(new SASL()).auth(mode, types, out, in, us)) {
+            out.close();
+            throw new IOException(_("Failed to auth"));
+        }
         if (null != us) {
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE, "Setting timeout to " + timeout + " on Socket");
+
+            debug(VERBOSE, "Setting timeout to " + timeout + " on Socket");
             if (timeout == 1)
                 us.setSoTimeout(0);
             else
                 us.setSoTimeout(timeout);
         }
         if (null != s) {
-            if (Debug.debug)
-                Debug.print(Debug.VERBOSE, "Setting timeout to " + timeout + " on Socket");
+
+            debug(VERBOSE, "Setting timeout to " + timeout + " on Socket");
             s.setSoTimeout(timeout);
         }
         mout = new MessageWriter(out);
@@ -787,8 +784,8 @@ public class Transport
 
     public void disconnect() throws IOException
     {
-        if (Debug.debug)
-            Debug.print(Debug.INFO, "Disconnecting Transport");
+
+        debug(INFO, "Disconnecting Transport");
         min.close();
         mout.close();
     }
