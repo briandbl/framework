@@ -8,15 +8,29 @@ import org.freedesktop.dbus.exceptions.DBusException;
 
 import java.util.Map;
 
+/**
+ * 
+ * Interface for connecting to org.bluez.Manager
+ * 
+ * @author Manuel Naranjo <naranjo.manuel@gmail.com>
+ *
+ */
 public interface Manager extends DBusInterface{
-
+    
     /*
      * Methods from manager-api.txt
      */
-    
+
+    /**
+     * 
+     * Dict with:
+     * List<Path> Adapters [readonly]
+     *
+     */
     @SuppressWarnings("rawtypes")
     public Map<String, Variant> GetProperties() throws 
             Error.DoesNotExist, Error.InvalidArguments;
+
     
     public String DefaultAdapter() throws
             Error.InvalidArguments, Error.NoSuchAdapter;
@@ -27,11 +41,14 @@ public interface Manager extends DBusInterface{
     /*
      * Signals from manager-api.txt
      */
-    public class PropertyChanged<T> extends DBusSignal {
+    
+    @SuppressWarnings("rawtypes")
+    public class PropertyChanged extends DBusSignal {
         String name;
-        Variant<T> value;
+        Variant value;
            
-        public PropertyChanged(String path, String name, Variant<T> value) throws DBusException{
+        public PropertyChanged(String path, String name, Variant value) 
+                throws DBusException{
             super(path, name, value);
             this.name = name;
             this.value = value;

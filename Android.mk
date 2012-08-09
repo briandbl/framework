@@ -22,8 +22,12 @@ LOCAL_SRC_FILES := \
 	java/src/android/server/le/BluetoothLEService.java \
 	java/src/android/bluetooth/le/IBluetoothLE.aidl \
 	java/src/org/bluez/Adapter.java \
-	java/src/org/bluez/dbus/Manager.java \
+	java/src/org/bluez/Characteristic.java \
+	java/src/org/bluez/Device.java \
 	java/src/org/bluez/Error.java \
+	java/src/org/bluez/Manager.java \
+	java/src/org/bluez/Service.java \
+	java/src/org/bluez/Watcher.java \
 	java/src/cx/ath/matthew/utils/Hexdump.java \
 	java/src/org/freedesktop/dbus/Struct.java \
 	java/src/org/freedesktop/dbus/Path.java \
