@@ -1,0 +1,6 @@
+export CLASSPATH="btle-framework.jar:btle-tests.jar"
+
+/system/bin/app_process /system/bin \
+	--nice-name=btle-framework \
+	android.server.le.test.TestManager
+
