@@ -24,12 +24,22 @@ public interface Device extends DBusInterface {
      */
 
     /**
-     * Properties from Adapter String Address [readonly] String Name [readonly]
-     * String Icon [readonly] Uint32 Class [readonly] List<String> UUIDs
-     * [readonly] List<Path> Services [readonly] boolean Paired [readonly]
-     * boolean Connected [readonly] boolean Trusted [readwrite] boolean Blocked
-     * [readwrite] String Alias [readwrite] List<Path> Nodes [readonly] Path
-     * Adapter [readonly] boolean LegacyPairing [readonly]
+     * Properties from Adapter 
+     * 
+     * String Address [readonly] 
+     * String Name [readonly]
+     * String Icon [readonly] 
+     * Uint32 Class [readonly] 
+     * List<String> UUIDs [readonly] 
+     * List<Path> Services [readonly] 
+     * boolean Paired [readonly]
+     * boolean Connected [readonly] 
+     * boolean Trusted [readwrite] 
+     * boolean Blocked [readwrite] 
+     * String Alias [readwrite] 
+     * List<Path> Nodes [readonly] 
+     * Path Adapter [readonly] 
+     * boolean LegacyPairing [readonly]
      * 
      * @throws Error.InvalidArguments
      */

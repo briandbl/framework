@@ -20,7 +20,7 @@ class DeviceFoundHandler implements DBusSigHandler<DeviceFound>{
         TestManager.info("Found " + s.address);
         Map<String, Variant> val = s.values;
         for (String k: val.keySet())
-            TestManager.info("prop " + k + ", " + val.get(k).toString());
+            TestManager.info("prop " + k + ":\t" + val.get(k).toString());
 
     }    
 }

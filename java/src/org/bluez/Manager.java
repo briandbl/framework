@@ -83,5 +83,5 @@ public interface Manager extends DBusInterface{
             super(path, value);
             this.value = value;
         }
-    } 
+    }
 }
