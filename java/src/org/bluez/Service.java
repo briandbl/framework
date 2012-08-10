@@ -2,6 +2,7 @@
 package org.bluez;
 
 import org.freedesktop.dbus.DBusInterface;
+import org.freedesktop.dbus.DBusInterfaceName;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
 
@@ -19,6 +20,7 @@ import java.util.Map;
  * 
  * @author Manuel Naranjo <naranjo.manuel@gmail.com>
  */
+@DBusInterfaceName("org.bluez.Characteristic")
 public interface Service extends DBusInterface {
     /**
      * Update characteristic value. For a remote characteristic, this method

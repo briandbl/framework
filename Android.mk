@@ -122,12 +122,15 @@ framework_built := $(call java-lib-deps,btle-framework)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	java/src/android/server/le/test/TestManager.java
-
+	java/src/android/server/le/test/TestManager.java \
+	java/src/android/server/le/test/TestDevice.java \
+	java/src/android/server/le/test/TestCharacteristic.java \
+	java/src/android/server/le/test/TestService.java
+ 
 LOCAL_NO_STANDARD_LIBRARIES := true
 LOCAL_JAVA_LIBRARIES := bouncycastle core core-junit ext framework btle-framework
 
-LOCAL_MODULE := btle-test-manager
+LOCAL_MODULE := btle-tests
 LOCAL_MODULE_CLASS := JAVA_LIBRARIES
 LOCAL_MODULE_TAGS := optional
 

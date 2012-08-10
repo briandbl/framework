@@ -2,11 +2,13 @@
 package org.bluez;
 
 import org.freedesktop.dbus.DBusInterface;
+import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Position;
 import org.freedesktop.dbus.Struct;
 import org.freedesktop.dbus.UInt16;
 import org.freedesktop.dbus.Variant;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -63,7 +65,7 @@ public interface Characteristic extends DBusInterface {
      * this will emit a PropertyChanged signal.
      */
     @SuppressWarnings("rawtypes")
-    void SetProperty(String name, Variant value) throws
+    public void SetProperty(String name, Variant value) throws
             Error.InvalidArguments;
     
     /**
