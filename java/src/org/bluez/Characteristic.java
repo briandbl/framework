@@ -20,7 +20,7 @@ import java.util.Map;
  * 
  * @author Manuel Naranjo <naranjo.manuel@gmail.com>
  */
-public interface Characeteristic extends DBusInterface {
+public interface Characteristic extends DBusInterface {
     
     @SuppressWarnings("rawtypes")
     /**
