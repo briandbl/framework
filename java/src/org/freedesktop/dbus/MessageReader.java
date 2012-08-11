@@ -15,7 +15,7 @@ import static org.freedesktop.dbus.Gettext._;
 
 import android.util.Log;
 
-import cx.ath.matthew.utils.Hexdump;
+import com.android.internal.util.HexDump;
 
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.MessageProtocolVersionException;
@@ -208,10 +208,10 @@ public class MessageReader
                         }));
         }
         {
-            debug(VERBOSE, Hexdump.format(buf));
-            debug(VERBOSE, Hexdump.format(tbuf));
-            debug(VERBOSE, Hexdump.format(header));
-            debug(VERBOSE, Hexdump.format(body));
+            debug(VERBOSE, HexDump.dumpHexString(buf));
+            debug(VERBOSE, HexDump.dumpHexString(tbuf));
+            debug(VERBOSE, HexDump.dumpHexString(header));
+            debug(VERBOSE, HexDump.dumpHexString(body));
         }
         try {
             m.populate(buf, header, body);

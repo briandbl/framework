@@ -17,7 +17,7 @@ import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.util.Log;
 
-import cx.ath.matthew.utils.Hexdump;
+import com.android.internal.util.HexDump;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,11 +28,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.lang.reflect.Method;
 import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.Collator;
 import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Random;
@@ -242,12 +240,12 @@ public class Transport
          */
         private String stupidlyEncode(String data)
         {
-            return Hexdump.toHex(data.getBytes()).replaceAll(" ", "");
+            return HexDump.dumpHexString(data.getBytes());
         }
 
         private String stupidlyEncode(byte[] data)
         {
-            return Hexdump.toHex(data).replaceAll(" ", "");
+            return HexDump.dumpHexString(data);
         }
 
         private byte getNibble(char c)
@@ -433,7 +431,7 @@ public class Transport
                     buf = md.digest(response.getBytes());
 
                     debug(VERBOSE,
-                            "Response: " + response + " hash: " + Hexdump.format(buf));
+                            "Response: " + response + " hash: " + HexDump.dumpHexString(buf));
                     response = stupidlyEncode(buf);
                     c.setResponse(stupidlyEncode(clientchallenge + " " + response));
                     return OK;

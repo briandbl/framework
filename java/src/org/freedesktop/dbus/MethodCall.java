@@ -15,7 +15,7 @@ import static org.freedesktop.dbus.Gettext._;
 
 import android.util.Log;
 
-import cx.ath.matthew.utils.Hexdump;
+import com.android.internal.util.HexDump;
 
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.MessageFormatException;
@@ -139,7 +139,7 @@ public class MethodCall extends Message
                 + bytecounter + " size: " + (bytecounter - c));
         marshallint(bytecounter - c, blen, 0, 4);
 
-        debug(DEBUG, "marshalled size (" + blen + "): " + Hexdump.format(blen));
+        debug(DEBUG, "marshalled size (" + blen + "): " + HexDump.dumpHexString(blen));
     }
 
     private static long REPLY_WAIT_TIMEOUT = 20000;

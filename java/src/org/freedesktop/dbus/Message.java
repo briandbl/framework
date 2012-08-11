@@ -15,7 +15,7 @@ import static org.freedesktop.dbus.Gettext._;
 
 import android.util.Log;
 
-import cx.ath.matthew.utils.Hexdump;
+import com.android.internal.util.HexDump;
 
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.MarshallingException;
@@ -462,7 +462,8 @@ public class Message
             marshallintLittle(l, buf, ofs, width);
 
         debug(VERBOSE,
-                "Marshalled int " + l + " to " + Hexdump.toHex(buf, ofs, width));
+                "Marshalled int " + l + " to " + 
+                        HexDump.dumpHexString(buf, ofs, width));
     }
 
     /**
@@ -1124,8 +1125,9 @@ public class Message
                 Object[] decontents = new Object[2];
                 debug(VERBOSE,
                         "Extracting Dict Entry ("
-                                + Hexdump.toAscii(sigb, ofs[0], sigb.length - ofs[0])
-                                + ") from: " + Hexdump.toHex(buf, ofs[1], buf.length - ofs[1]));
+                                + HexDump.dumpHexString(sigb,ofs[0], sigb.length-ofs[0])
+                                + ") from: " 
+                                + HexDump.dumpHexString(buf, ofs[1], buf.length - ofs[1]));
                 ofs[0]++;
                 decontents[0] = extractone(sigb, buf, ofs, true);
                 ofs[0]++;

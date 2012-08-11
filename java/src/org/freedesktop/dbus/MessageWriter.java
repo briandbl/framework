@@ -13,7 +13,7 @@ package org.freedesktop.dbus;
 
 import android.util.Log;
 
-import cx.ath.matthew.utils.Hexdump;
+import com.android.internal.util.HexDump;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -71,7 +71,8 @@ public class MessageWriter
         }
         for (byte[] buf : m.getWireData()) {
             debug(VERBOSE,
-                        "(" + buf + "):" + (null == buf ? "" : Hexdump.format(buf)));
+                        "(" + buf + "):" + (null == buf ? "" : 
+                            HexDump.dumpHexString(buf)));
             if (null == buf)
                 break;
             out.write(buf);
