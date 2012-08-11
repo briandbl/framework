@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="android.bluetooth.le"
+  android:sharedUserId="bluetooth">
+
+    <original-package android:name="android.bluetooth.le" />
+
+    
+    <!-- requires this set of permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />    
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+</manifest>

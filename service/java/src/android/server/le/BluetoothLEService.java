@@ -17,10 +17,9 @@
 package android.server.le;
 
 import android.bluetooth.BluetoothAdapter;
-import android.util.Log;
-import android.os.ServiceManager;
 import android.os.Looper;
 import android.os.Process;
+import android.util.Log;
 
 import com.android.internal.os.BinderInternal;
 

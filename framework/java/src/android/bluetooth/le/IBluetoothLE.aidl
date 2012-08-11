@@ -18,4 +18,5 @@
 package android.bluetooth.le;
  
 interface IBluetoothLE {
+	String getAdapterPath();
 }

@@ -17,18 +17,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := \
-	java/src/android/bluetooth/le/BluetoothAdapterLE.java \
-	java/src/android/server/le/BluetoothLEService.java \
-	java/src/android/bluetooth/le/IBluetoothLE.aidl \
-	java/src/org/bluez/Adapter.java \
-	java/src/org/bluez/Characteristic.java \
-	java/src/org/bluez/Device.java \
-	java/src/org/bluez/Error.java \
-	java/src/org/bluez/Manager.java \
-	java/src/org/bluez/Service.java \
-	java/src/org/bluez/Watcher.java \
-	java/src/cx/ath/matthew/utils/Hexdump.java \
+dbus_sources := \
 	java/src/org/freedesktop/dbus/Struct.java \
 	java/src/org/freedesktop/dbus/Path.java \
 	java/src/org/freedesktop/dbus/UInt32.java \
@@ -91,33 +80,29 @@ LOCAL_SRC_FILES := \
 	java/src/org/freedesktop/dbus/EfficientQueue.java \
 	java/src/org/freedesktop/DBus.java
 
+dbus_interface := \
+	java/src/org/bluez/Adapter.java \
+	java/src/org/bluez/Characteristic.java \
+	java/src/org/bluez/Device.java \
+	java/src/org/bluez/Error.java \
+	java/src/org/bluez/Manager.java \
+	java/src/org/bluez/Service.java \
+	java/src/org/bluez/Watcher.java
 
-aidl_files := java/scr/android/bluetooth/le/IBluetoothLE.aidl
-#$(gen): PRIVATE_SRC_FILES := $(aidl_files)
-#$(gen): $(aidl_files) | $(AIDL)
-#		@echo Aidl Preprocess: $@
-#		$(hide) $(AIDL) --preprocess $@ $(PRIVATE_SRC_FILES)
+aidl_src := \
+	java/src/android/bluetooth/le/IBluetoothLE.aidl
 
-# FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
-#LOCAL_AIDL_INCLUDES := $(FRAMEWORKS_BASE_JAVA_SRC_DIRS)
-
-LOCAL_NO_STANDARD_LIBRARIES := true
-LOCAL_JAVA_LIBRARIES := bouncycastle core core-junit ext framework
-
-LOCAL_MODULE := btle-framework
-LOCAL_MODULE_CLASS := JAVA_LIBRARIES
-
-LOCAL_NO_EMMA_INSTRUMENT := true
-LOCAL_NO_EMMA_COMPILE := true
-
-#LOCAL_JARJAR_RULES := $(LOCAL_PATH)/jarjar-rules.txt
-
-LOCAL_DX_FLAGS := --core-library
 LOCAL_MODULE_TAGS := optional
 
-include $(BUILD_JAVA_LIBRARY)
+LOCAL_SRC_FILES := $(call all-subdir-java-files)
 
-framework_built := $(call java-lib-deps,btle-framework)
+LOCAL_PACKAGE_NAME := Bluetooth-LE-API
+
+LOCAL_JAVA_LIBRARIES := android.bluetooth.le
+
+LOCAL_CERTIFICATE := platform
+
+include $(BUILD_PACKAGE)
 
 include $(CLEAR_VARS)
 
@@ -126,7 +111,10 @@ LOCAL_SRC_FILES := \
 	java/src/android/server/le/test/TestDevice.java \
 	java/src/android/server/le/test/TestCharacteristic.java \
 	java/src/android/server/le/test/TestService.java
- 
+
+LOCAL_SRC_FILES += ${dbus_sources}
+LOCAL_SRC_FILES += ${dbus_interface}
+
 LOCAL_NO_STANDARD_LIBRARIES := true
 LOCAL_JAVA_LIBRARIES := bouncycastle core core-junit ext framework btle-framework
 
@@ -138,4 +126,3 @@ LOCAL_NO_EMMA_INSTRUMENT := true
 LOCAL_NO_EMMA_COMPILE := true
 
 include $(BUILD_JAVA_LIBRARY)
-
