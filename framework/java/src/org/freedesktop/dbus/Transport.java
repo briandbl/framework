@@ -234,18 +234,45 @@ public class Transport
             lock.delete();
         }
 
+        public static final char[] hexchars = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+        public static String toHex(byte[] buf)
+        {
+           return toHex(buf, 0, buf.length);
+        }
+        public static String toHex(byte[] buf, int ofs, int len)
+        {
+           StringBuffer sb = new StringBuffer();
+           int j = ofs+len;
+           for (int i = ofs; i < j; i++) {
+              if (i < buf.length) {
+                 sb.append(hexchars[(buf[i] & 0xF0) >> 4]);
+                 sb.append(hexchars[buf[i] & 0x0F]);
+                 sb.append(' ');
+              } else {
+                 sb.append(' ');
+                 sb.append(' ');
+                 sb.append(' ');
+              }
+           }
+           return sb.toString();
+        }
+        
         /**
          * Takes the string, encodes it as hex and then turns it into a string
          * again. No, I don't know why either.
          */
         private String stupidlyEncode(String data)
         {
-            return HexDump.dumpHexString(data.getBytes());
+            String encoded = toHex(data.getBytes()).replace(" ", "");
+            Log.v(TAG, "stupidlyEnconde " + data);
+            Log.v(TAG, "result " + data);
+            
+            return encoded;
         }
 
         private String stupidlyEncode(byte[] data)
         {
-            return HexDump.dumpHexString(data);
+            return toHex(data).replace(" ", "");
         }
 
         private byte getNibble(char c)

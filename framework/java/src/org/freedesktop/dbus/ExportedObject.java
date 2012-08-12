@@ -37,15 +37,15 @@ class ExportedObject
     {
         String ans = "";
         for (Annotation a : c.getDeclaredAnnotations()) {
-            Class t = a.annotationType();
+            Class<? extends Annotation> t = a.annotationType();
             String value = "";
-            try {
+            /*try {
                 Method m = t.getMethod("value");
                 value = m.invoke(a).toString();
             } catch (NoSuchMethodException NSMe) {
             } catch (InvocationTargetException ITe) {
             } catch (IllegalAccessException IAe) {
-            }
+            }*/
 
             ans += "  <annotation name=\""
                     + AbstractConnection.dollar_pattern.matcher(t.getName()).replaceAll(".")

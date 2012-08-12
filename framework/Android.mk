@@ -17,16 +17,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-aidl_src := \
-	java/src/android/bluetooth/le/IBluetoothLE.aidl
-
-api_src := \
-	java/src/android/bluetooth/le/BluetoothAdapterLE.java
-
-LOCAL_SRC_FILES := ${api_src}
-LOCAL_SRC_FILES += ${aidl_src}
-
-aidl_files := ${aidl_src}
+LOCAL_SRC_FILES := $(call all-subdir-java-files, src)
 
 LOCAL_NO_STANDARD_LIBRARIES := true
 LOCAL_JAVA_LIBRARIES := bouncycastle core ext framework
@@ -41,5 +32,3 @@ LOCAL_DX_FLAGS := --core-library
 LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_JAVA_LIBRARY)
-
-framework_built := $(call java-lib-deps,btle-framework)
