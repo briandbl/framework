@@ -64,12 +64,7 @@ public class BleAdapter
         return false;
         // return adapter.getRemoteServices(deviceAddress);
     }
-
-    public BleAdapter(Context context)
-    {
-        this.mContext = context;
-        this.mSvcConn = new GattServiceConnection(context);
-    }
+       
 
     public void init()
     {

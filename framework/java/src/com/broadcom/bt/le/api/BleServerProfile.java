@@ -284,8 +284,8 @@ public abstract class BleServerProfile
 
             if (service != null)
                 try {
-                    BleServerProfile.access$002(BleServerProfile.this,
-                            IBluetoothGatt.Stub.asInterface(service));
+                    BleServerProfile.this.mService = 
+                             IBluetoothGatt.Stub.asInterface(service);
                     BleServerProfile.this.initProfile();
                 } catch (Throwable t) {
                     Log.e("BleServerProfile", "Unable to get Binder to GattService", t);

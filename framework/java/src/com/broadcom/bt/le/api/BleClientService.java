@@ -911,7 +911,7 @@ public abstract class BleClientService
                             }
                             else
                             {
-                                BleClientService.access$202(BleClientService.this, false);
+                                BleClientService.this.mReadDescriptors = false;
                                 BleClientService.this.onReadCharacteristicComplete(
                                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                                         c);
@@ -971,7 +971,8 @@ public abstract class BleClientService
             BleClientService.ServiceData s = BleClientService.this.getServiceData(
                     BleClientService.this.mProfile.getDeviceforConnId(connID), instanceID);
 
-            for (int i = 0; i < s.characteristics.size(); i++) {
+            int i;
+            for (i = 0; i < s.characteristics.size(); i++) {
                 BleCharacteristic cTemp = (BleCharacteristic) s.characteristics.get(i);
                 if (c.getID().equals(cTemp.getID()))
                 {

@@ -376,8 +376,7 @@ public abstract class BleClientProfile
 
             if (service != null)
                 try {
-                    BleClientProfile.access$802(BleClientProfile.this,
-                            IBluetoothGatt.Stub.asInterface(service));
+                    BleClientProfile.this.mService = IBluetoothGatt.Stub.asInterface(service);
 
                     for (int i = 0; i < BleClientProfile.this.mRequiredServices.size(); i++) {
                         ((BleClientService) BleClientProfile.this.mRequiredServices.get(i))
@@ -417,7 +416,7 @@ public abstract class BleClientProfile
                     + BleClientProfile.this.mAppUuid + ") status = " + status + " client_if = "
                     + client_if);
 
-            BleClientProfile.access$102(BleClientProfile.this, client_if);
+            BleClientProfile.this.mClientIf = client_if;
             BleClientProfile.this.onProfileRegistered();
         }
 
@@ -425,7 +424,7 @@ public abstract class BleClientProfile
             Log.d("BleClientProfile", "BleClientCallback::onAppDeregistered ("
                     + BleClientProfile.this.mAppUuid + ") client_if = " + client_if);
 
-            BleClientProfile.access$102(BleClientProfile.this, 0);
+            BleClientProfile.this.mClientIf = 0;
             BleClientProfile.this.onProfileDeregistered();
         }
 
@@ -455,7 +454,7 @@ public abstract class BleClientProfile
             if (d.getBondState() == 12) {
                 Log.d("BleClientProfile",
                         "onConnected device is bonded start encrypt the  link");
-                BleClientProfile.this.setEncryption(d, 1);
+                BleClientProfile.this.setEncryption(d, (byte)1);
             }
             BleClientProfile.this.mClientIDToDeviceMap.put(new Integer(connID), d);
             BleClientProfile.this.mDeviceToClientIDMap.put(d, new Integer(connID));
