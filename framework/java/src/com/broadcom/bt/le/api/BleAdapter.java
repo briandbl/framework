@@ -1,4 +1,3 @@
-
 package com.broadcom.bt.le.api;
 
 import android.bluetooth.BluetoothAdapter;
@@ -89,10 +88,12 @@ public class BleAdapter
         }
     }
 
+    
     public void finalize() {
         finish();
     }
 
+    
     public void setScanParameters(int scanInterval, int scanWindow)
     {
         try

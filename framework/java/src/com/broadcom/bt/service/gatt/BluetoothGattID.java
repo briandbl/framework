@@ -1,4 +1,3 @@
-
 package com.broadcom.bt.service.gatt;
 
 import android.os.Parcel;

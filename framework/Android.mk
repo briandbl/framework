@@ -17,7 +17,18 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := $(call all-subdir-java-files, src)
+LOCAL_SRC_FILES := \
+		java/src/android/bluetooth/le/IBluetoothLE.aidl \
+		java/src/com/broadcom/bt/le/api/IBleServiceEventHandler.aidl \
+		java/src/com/broadcom/bt/le/api/IBleServiceCallback.aidl \
+		java/src/com/broadcom/bt/le/api/IBleProfileEventCallback.aidl \
+		java/src/com/broadcom/bt/le/api/IBleClientCallback.aidl \
+		java/src/com/broadcom/bt/le/api/IBleCharacteristicDataCallback.aidl \
+		java/src/com/broadcom/bt/service/gatt/IBluetoothGatt.aidl
+
+LOCAL_SRC_FILES += $(call all-subdir-java-files, java)
+
+LOCAL_AIDL_INCLUDES += btle/framework/java/src/
 
 LOCAL_NO_STANDARD_LIBRARIES := true
 LOCAL_JAVA_LIBRARIES := bouncycastle core ext framework
