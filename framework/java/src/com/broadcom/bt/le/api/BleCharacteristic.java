@@ -1,7 +1,5 @@
 
-
 package com.broadcom.bt.le.api;
-
 
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -12,68 +10,108 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-
+/**
+ * Represents a Bluetooth LE service characteristic.<br>
+ * <br>
+ * A characteristic contains descriptors including the actual value, as well as
+ * meta data such as the presentation format or a human readable description of
+ * the value. <br>
+ * <br>
+ * A BleCharacteristic serves as a data container used by LE services to read
+ * and write characteristics. The properties of this class include: <br>
+ * <br>
+ * <ul>
+ * <li>The raw value of the characteristic</li>
+ * <li>Collection of descriptors</li>
+ * </ul>
+ * A BleCharacteristic is usually assigned to, or retrieved by an instance of a
+ * {@link BleClientService} or {@link BleServerService} class.
+ */
 public class BleCharacteristic extends BleAttribute
         implements Parcelable
 {
     private static final String TAG = "BleCharacteristic";
-    private HashMap<BleGattID, BleDescriptor> mDescriptorMap = new HashMap();
-    private ArrayList<BleDescriptor> mDirtyDescQueue = new ArrayList();
+    private HashMap<BleGattID, BleDescriptor> mDescriptorMap = new HashMap<BleGattID, BleDescriptor>();
+    private ArrayList<BleDescriptor> mDirtyDescQueue = new ArrayList<BleDescriptor>();
     private int mProp;
     private int mWriteType;
     private byte mAuthReq;
     private int mPermission = 0;
-    
+
+    /** @hide */
+    @SuppressWarnings({
+            "rawtypes", "unchecked"
+    })
     public static final Parcelable.Creator<BleCharacteristic> CREATOR = new Parcelable.Creator()
     {
+        @Override
         public BleCharacteristic createFromParcel(Parcel source) {
             return new BleCharacteristic(source);
-            }
+        }
 
-        
+        @Override
         public BleCharacteristic[] newArray(int size)
         {
             return new BleCharacteristic[size];
-            }
-        
+        }
+
     };
 
-    
+    /** @hide */
     public BleCharacteristic(Parcel source)
     {
         super(source);
-        }
+    }
 
-    
     public BleCharacteristic(BleGattID charID)
     {
         super(charID);
-        }
+    }
 
-    
     private BleGattID getBleGattId(int handle)
     {
-        for (Map.Entry entry : this.mHandleMap.entrySet()) {
-            if (handle == ((Integer) entry.getValue()).intValue()) {
-                return (BleGattID) entry.getKey();
-                }
+        for (Map.Entry<BleGattID, Integer> entry : mHandleMap.entrySet()) {
+            if (handle == entry.getValue().intValue()) {
+                return entry.getKey();
             }
-        return null;
         }
+        return null;
+    }
 
-    
+    /**
+     * Returns the instance ID of this characteristic. The instance ID is used
+     * by BLE profiles and services to identify which characteristics belong to
+     * a given instance of the LE service or profile.
+     * 
+     * @see {@link #setInstanceID(int)}
+     */
     public int getInstanceID()
     {
-        return this.mID.getInstanceID();
-        }
+        return mID.getInstanceID();
+    }
 
-    
+    /**
+     * Assigns an instance ID to this characteristic.
+     * 
+     * @see {@link #getInstanceID()}
+     */
     public void setInstanceID(int instanceID)
     {
-        this.mID.setInstanceId(instanceID);
-        }
+        mID.setInstanceId(instanceID);
+    }
 
-    
+    /**
+     * Set the raw value bytes for this characteristic starting at a given
+     * offset
+     * 
+     * @param value byte array with values to write
+     * @param offset offset into the value array
+     * @param len amount of elements from the value array
+     * @param handle GATT id
+     * @param totalsize attribute length
+     * @param address remote device Bluetooth address
+     * @return {@link BleConstants#GATT_SUCCESS} if written
+     */
     public byte setValue(byte[] value, int offset, int len, int handle, int totalsize,
             String address)
     {
@@ -81,251 +119,341 @@ public class BleCharacteristic extends BleAttribute
         int uuidType = -1;
         Log.e("BleCharacteristic", "#### handle is " + handle + " total size is "
                 + totalsize);
-        
+
         BleGattID gattUuid = getBleGattId(handle);
         if (gattUuid == null) {
             Log.e("BleCharacteristic", "setValue: Invalid handle");
-            return 1;
-            }
-        
-        if (gattUuid.equals(this.mID)) {
+            return BleConstants.GATT_INVALID_HANDLE;
+        }
+
+        if (gattUuid.equals(mID)) {
             Log.i("BleCharacteristic", "##Writing a characteristic value..");
             Log.i("BleCharacteristic", "##offset=" + offset + " mMaxLength="
-                    + this.mMaxLength + " totalsize=" + totalsize);
+                    + mMaxLength + " totalsize=" + totalsize);
             return setValue(value, offset, len, gattUuid, totalsize, address);
-            }
-        BleDescriptor descObj = (BleDescriptor) this.mDescriptorMap.get(gattUuid);
+        }
+        BleDescriptor descObj = mDescriptorMap.get(gattUuid);
         if (descObj != null) {
             Log.i("BleCharacteristic", "##Writing descriptor value..");
             Log.i("BleCharacteristic",
                     "##offset=" + offset + " mMaxSize=" + descObj.getMaxLength() + " totalsize="
                             + totalsize + "desc uuid =" + descObj.getID());
             if (offset > descObj.getMaxLength())
-                return 7;
+                return BleConstants.GATT_INVALID_OFFSET;
             if (offset + totalsize > descObj.getMaxLength())
-                return 13;
+                return BleConstants.GATT_INVALID_ATTR_LEN;
             Log.i("BleCharacteristic", "find the user defined descriptor ");
             return descObj.setValue(value, offset, len, gattUuid, totalsize, address);
-            }
+        }
         Log.e("BleCharacteristic", "Failed to write the value correctly!!!");
         return -127;
-        }
+    }
 
-    
+    /**
+     * Set the raw value bytes for this characteristic starting at a given
+     * offset
+     */
+    @Override
     public byte setValue(byte[] value, int offset, int len, BleGattID gattUuid, int totalsize,
             String address)
     {
         return super.setValue(value, offset, len, gattUuid, totalsize, address);
-        }
+    }
 
-    
+    /**
+     * Gets the characteristic properties value (bit field).
+     */
     public int getProperty()
     {
-        return this.mProp;
-        }
+        return mProp;
+    }
 
-    
+    /**
+     * Sets the charactereristic properties (Broadcast, read, write etc.).
+     * 
+     * @see {@link BleConstants#GATT_CHAR_PROP_BIT_BROADCAST},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_READ},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_WRITE_NR},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_WRITE},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_NOTIFY},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_INDICATE},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_AUTH},
+     *      {@link BleConstants#GATT_CHAR_PROP_BIT_EXT_PROP}
+     */
     public void setProperty(int Prop)
     {
-        this.mProp = Prop;
-        }
+        mProp = Prop;
+    }
 
-    
-    public BleDescriptor getDescriptor(BleGattID descId)
+    /**
+     * Gets a descriptor based on UUID
+     * 
+     * @return descriptor object
+     */
+    public BleDescriptor getDescriptor(BleGattID descriptor)
     {
-        BleDescriptor descObj = (BleDescriptor) this.mDescriptorMap.get(descId);
+        BleDescriptor descObj = mDescriptorMap.get(descriptor);
         if (descObj != null) {
             return descObj;
-            }
-        
-        return null;
         }
 
-    
+        return null;
+    }
+
+    /**
+     * Adds a descriptor object
+     */
     public void addDescriptor(BleGattID descId, BleDescriptor descriptor)
     {
         Log.d("BleCharacteristic", "Inside add descriptor");
-        this.mDescriptorMap.put(descId, descriptor);
-        this.mDirtyDescQueue.add(descriptor);
+        mDescriptorMap.put(descId, descriptor);
+        mDirtyDescQueue.add(descriptor);
         descriptor.setCharRef(this);
-        }
+    }
 
-    
+    /**
+     * Adds a descriptor object
+     */
     public void addDescriptor(BleDescriptor descriptor)
     {
-        this.mDescriptorMap.put(descriptor.mID, descriptor);
-        this.mDirtyDescQueue.add(descriptor);
+        mDescriptorMap.put(descriptor.mID, descriptor);
+        mDirtyDescQueue.add(descriptor);
         descriptor.setCharRef(this);
-        }
+    }
 
-    
+    /**
+     * Returns an array of all user defined descriptors that are contained
+     * within this characteristic.
+     * 
+     * @see {@link BleDescriptor}
+     */
     public ArrayList<BleDescriptor> getAllDescriptors()
     {
-        ArrayList descList = new ArrayList();
-        for (Map.Entry entrySet : this.mDescriptorMap.entrySet()) {
+        ArrayList<BleDescriptor> descList = new ArrayList<BleDescriptor>();
+        for (Map.Entry<BleGattID, BleDescriptor> entrySet : mDescriptorMap.entrySet()) {
             descList.add(entrySet.getValue());
-            }
-        return descList;
         }
+        return descList;
+    }
 
-    
+    /**
+     * Returns a list of all descriptors inside this characteristic that have
+     * been modified.
+     */
     public ArrayList<BleDescriptor> getDirtyDescQueue()
     {
-        return this.mDirtyDescQueue;
-        }
+        return mDirtyDescQueue;
+    }
 
-    
     void updateDirtyDescQueue()
     {
-        if (!this.mDirtyDescQueue.isEmpty())
-            this.mDirtyDescQueue.remove(0);
-        }
+        if (!mDirtyDescQueue.isEmpty())
+            mDirtyDescQueue.remove(0);
+    }
 
-    
+    /**
+     * Maps an attribute of this attribute to a handle value.
+     * 
+     * @see {@link #getValueByHandle(int)}
+     */
     public void addHandle(BleGattID uuid, int handle)
     {
-        this.mHandleMap.put(uuid, Integer.valueOf(handle));
-        }
+        mHandleMap.put(uuid, Integer.valueOf(handle));
+    }
 
-    
+    /**
+     * Returns a handle for a given attribute ID
+     */
     public int getHandle(BleGattID uuid)
     {
         Integer tmp;
-        if ((tmp = (Integer) this.mHandleMap.get(uuid)) != null) {
+        if ((tmp = mHandleMap.get(uuid)) != null) {
             return tmp.intValue();
-            }
-        return -1;
         }
+        return -1;
+    }
 
-    
+    /**
+     * Sets the level of authentication required to read/write this attribute.
+     */
+    @Override
     public void setAuthReq(byte AuthReq)
     {
-        this.mAuthReq = AuthReq;
-        }
+        mAuthReq = AuthReq;
+    }
 
-    
+    /**
+     * Returns an array of all user defined descriptors that are contained
+     * within this characteristic.
+     * 
+     * @see {@link BleDescriptor}
+     */
+    @Override
     public byte getAuthReq()
     {
-        return this.mAuthReq;
-        }
+        return mAuthReq;
+    }
 
-    
+    /**
+     * @return whether this characteristic broadcasts it's value
+     */
     public boolean isBroadcast() {
-        return (this.mProp & 0x1) == 1;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_BROADCAST) == BleConstants.GATT_CHAR_PROP_BIT_BROADCAST;
+    }
 
-    
+    /**
+     * @return whether this characteristic is readable
+     */
     public boolean isReadable() {
-        return (this.mProp & 0x2) == 2;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_READ) == BleConstants.GATT_CHAR_PROP_BIT_READ;
+    }
 
-    
+    /**
+     * @return whether this characteristic is writable
+     */
     public boolean isWritable() {
-        return (this.mProp & 0x8) == 8;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_WRITE) == BleConstants.GATT_CHAR_PROP_BIT_WRITE;
+    }
 
-    
+    /**
+     * @return whether this characteristic is writable async
+     */
     public boolean isWritablewithNoAck() {
-        return (this.mProp & 0x4) == 4;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_WRITE_NR) == BleConstants.GATT_CHAR_PROP_BIT_WRITE_NR;
+    }
 
-    
+    /**
+     * @return whether this characteristic can be notified
+     */
     public boolean isNotifyable() {
-        return (this.mProp & 0x10) == 16;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_NOTIFY) == BleConstants.GATT_CHAR_PROP_BIT_NOTIFY;
+    }
 
-    
+    /**
+     * @return whether this characteristic can be indicated
+     */
     public boolean isIndicateable() {
-        return (this.mProp & 0x20) == 32;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_INDICATE) == BleConstants.GATT_CHAR_PROP_BIT_INDICATE;
+    }
 
-    
+    /**
+     * Sets the write type for this characteristic
+     * 
+     * @see {@link BleConstants#GATTC_TYPE_WRITE},
+     *      {@link BleConstants#GATTC_TYPE_WRITE_NO_RSP}
+     */
+    @Override
     public void setWriteType(int writeType)
     {
         this.mWriteType = writeType;
-        }
+    }
 
-    
+    /**
+     * Returns whether this characteristic requires waiting for write operations
+     * to be acknowledged or not.
+     * 
+     * @see {@link #setWriteType(int)}
+     */
+    @Override
     public int getWriteType()
     {
-        return this.mWriteType;
-        }
+        return mWriteType;
+    }
 
-    
+    /**
+     * Returns whether this characteristic permits signed writes.
+     */
     public boolean isAuthenticated()
     {
-        return (this.mProp & 0x40) == 64;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_AUTH) == BleConstants.GATT_CHAR_PROP_BIT_AUTH;
+    }
 
-    
+    /**
+     * @return whether this characteristics has extended properties
+     */
     public boolean hasExtendedProperties() {
-        return (this.mProp & 0xFFFFFF80) == -128;
-        }
+        return (mProp & BleConstants.GATT_CHAR_PROP_BIT_EXT_PROP) == BleConstants.GATT_CHAR_PROP_BIT_EXT_PROP;
+    }
 
-    
+    /**
+     * Returns an attribute of this characteristic based on a previously
+     * assigned handle value.
+     */
+    @Override
     public byte[] getValueByHandle(int handle)
     {
         BleGattID gattUuid = getBleGattId(handle);
         if (gattUuid == null) {
             Log.w("BleCharacteristic", "Attribute UUID not found with handle " + handle);
             return null;
-            }
+        }
         int uuidType = gattUuid.getUuidType();
-        if (uuidType == 2)
+        if (uuidType == BleConstants.GATT_UUID_TYPE_16)
             return getValueByUUID16(gattUuid);
-        if (uuidType == 16) {
+        if (uuidType == BleConstants.GATT_UUID_TYPE_128) {
             return getValueByUUID128(gattUuid);
-            }
+        }
         Log.w("BleCharacteristic", "Invalid UUID type.");
         return null;
-        }
+    }
 
-    
+    /**
+     * Retrieves an attribute of this characteristic based on the 16bit UUID
+     * 
+     * @return null if no attribute was found matching the provided UUID.
+     *         <b>Note:</b> If the attribute value is empty, a 0 byte array is
+     *         returned.
+     */
     public byte[] getValueByUUID16(BleGattID uuid)
     {
         int uuid16 = uuid.getUuid16();
         if (uuid16 == -1) {
             Log.w("BleCharacteristic", "Invalid UUID16.");
             return null;
-            }
-        
-        int thisAttrUuid16 = this.mID == null ? -1 : this.mID.getUuid16();
+        }
+
+        int thisAttrUuid16 = mID == null ? -1 : mID.getUuid16();
         if (uuid16 == thisAttrUuid16)
         {
             return getValue();
-            }
-        
-        BleDescriptor descObj = (BleDescriptor) this.mDescriptorMap.get(uuid);
-        
+        }
+
+        BleDescriptor descObj = mDescriptorMap.get(uuid);
+
         if (descObj != null) {
             Log.d("BleCharacteristic", "Descriptor UUID = " + descObj.getID().getUuid16());
             return descObj.getValue();
-            }
-        
+        }
+
         Log.w("BleCharacteristic", "Attribute query not supported for uuid16 value "
                 + uuid16);
         return null;
-        }
+    }
 
-    
+    /**
+     * Returns an attribute of this characteristic based on the 128bit UUID
+     * 
+     * @return null if no attribute was found with the given UUID. <b>Note</b>:
+     *         If the attribute value is empty, a 0 byte array is returned.
+     */
     public byte[] getValueByUUID128(BleGattID uuid)
     {
         UUID uuid128 = uuid.getUuid();
         if (uuid128 == null) {
             return null;
-            }
-        
-        if ((this.mID != null) && (uuid128.equals(this.mID.getUuid()))) {
+        }
+
+        if ((mID != null) && (uuid128.equals(mID.getUuid()))) {
             return getValue();
-            }
-        
-        BleDescriptor descObj = (BleDescriptor) this.mDescriptorMap.get(uuid);
+        }
+
+        BleDescriptor descObj = mDescriptorMap.get(uuid);
         if (descObj != null) {
             return descObj.getValue();
-            }
+        }
         Log.w("BleCharacteristic", "Attribute query not supported for uuid128 value "
                 + uuid128);
         return null;
-        }
-    
+    }
+
 }

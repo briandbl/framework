@@ -8,6 +8,10 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * Represents a Bluetooth LE attribute. {@link BleCharacteristic} and
+ * {@link BleDescriptor} objects are derived from this class.
+ */
 public class BleAttribute
         implements Parcelable
 {
@@ -23,22 +27,25 @@ public class BleAttribute
     protected int mPermissionMask = 0;
     protected int mKeySize = 0;
     protected byte mAuthReq = 0;
-    protected int mWriteType = 2;
+    protected int mWriteType = BleConstants.GATTC_TYPE_WRITE;
 
-    protected int mHandle = -1;
+    protected int mHandle = BleConstants.GATT_UNDEFINED;
     protected byte[] mValue = null;
 
     private int mPermission = 0;
 
-    HashMap<BleGattID, Integer> mHandleMap = new HashMap();
+    HashMap<BleGattID, Integer> mHandleMap = new HashMap<BleGattID, Integer>();
 
-    HashMap<String, ArrayList<PrepareWriteContext>> writeQueue = new HashMap();
+    HashMap<String, ArrayList<PrepareWriteContext>> writeQueue = new HashMap<String, ArrayList<PrepareWriteContext>>();
 
-    HashMap<String, Integer> writeSizeQueue = new HashMap();
+    HashMap<String, Integer> writeSizeQueue = new HashMap<String, Integer>();
 
     @SuppressWarnings({
             "rawtypes", "unchecked"
     })
+    /**
+     * @hide
+     */
     public static final Parcelable.Creator<BleAttribute> CREATOR = new Parcelable.Creator()
     {
         public BleAttribute createFromParcel(Parcel source) {
@@ -52,9 +59,12 @@ public class BleAttribute
 
     };
 
+    /**
+     * Returns the UUID of this attribute.
+     */
     public BleGattID getID()
     {
-        return this.mID;
+        return mID;
     }
 
     public BleAttribute(Parcel source)
@@ -63,160 +73,254 @@ public class BleAttribute
 
     public BleAttribute(BleGattID attrID)
     {
-        this.mID = attrID;
+        mID = attrID;
 
-        this.mMaxLength = 100;
-        this.mValue = new byte[this.mMaxLength];
+        mMaxLength = BleConstants.GATT_MAX_CHAR_VALUE_LENGTH;
+        mValue = new byte[mMaxLength];
     }
 
+    /**
+     * Indicates if this object has been modified.
+     */
     public boolean isDirty()
     {
-        return this.mDirty;
+        return mDirty;
     }
 
+    /**
+     * A BleAttribute automatically marks itself as dirty when a value is
+     * modified using the appropriate setters. This function allows the internal
+     * state to be overwritten.
+     */
     public void setDirty(boolean dirty)
     {
-        this.mDirty = dirty;
+        mDirty = dirty;
     }
 
+    /**
+     * Returns the format of this attribute.
+     * 
+     * @see {@link BleConstants#GATT_FORMAT_RES},
+     *      {@link BleConstants#GATT_FORMAT_BOOL},
+     *      {@link BleConstants#GATT_FORMAT_2BITS},
+     *      {@link BleConstants#GATT_FORMAT_NIBBLE},
+     *      {@link BleConstants#GATT_FORMAT_UINT8},
+     *      {@link BleConstants#GATT_FORMAT_UINT12},
+     *      {@link BleConstants#GATT_FORMAT_UINT16},
+     *      {@link BleConstants#GATT_FORMAT_UINT24},
+     *      {@link BleConstants#GATT_FORMAT_UINT32},
+     *      {@link BleConstants#GATT_FORMAT_UINT48},
+     *      {@link BleConstants#GATT_FORMAT_UINT64},
+     *      {@link BleConstants#GATT_FORMAT_UINT128},
+     *      {@link BleConstants#GATT_FORMAT_SINT8},
+     *      {@link BleConstants#GATT_FORMAT_SINT12},
+     *      {@link BleConstants#GATT_FORMAT_SINT16},
+     *      {@link BleConstants#GATT_FORMAT_SINT24},
+     *      {@link BleConstants#GATT_FORMAT_SINT32},
+     *      {@link BleConstants#GATT_FORMAT_SINT48},
+     *      {@link BleConstants#GATT_FORMAT_SINT64},
+     *      {@link BleConstants#GATT_FORMAT_SINT128},
+     *      {@link BleConstants#GATT_FORMAT_FLOAT32},
+     *      {@link BleConstants#GATT_FORMAT_FLOAT64},
+     *      {@link BleConstants#GATT_FORMAT_SFLOAT},
+     *      {@link BleConstants#GATT_FORMAT_FLOAT},
+     *      {@link BleConstants#GATT_FORMAT_DUINT16},
+     *      {@link BleConstants#GATT_FORMAT_UTF8S},
+     *      {@link BleConstants#GATT_FORMAT_UTF16S},
+     *      {@link BleConstants#GATT_FORMAT_STRUCT},
+     *      {@link BleConstants#GATT_FORMAT_MAX}
+     */
     public int getValueFormat()
     {
-        return this.mFormat;
+        return mFormat;
     }
 
+    /**
+     * Sets the value format of the attribute based on a predefined constant
+     * representing a attribute value format
+     * 
+     * @param format any of {@link BleConstants#GATT_FORMAT_RES},
+     *            {@link BleConstants#GATT_FORMAT_BOOL},
+     *            {@link BleConstants#GATT_FORMAT_2BITS},
+     *            {@link BleConstants#GATT_FORMAT_NIBBLE},
+     *            {@link BleConstants#GATT_FORMAT_UINT8},
+     *            {@link BleConstants#GATT_FORMAT_UINT12},
+     *            {@link BleConstants#GATT_FORMAT_UINT16},
+     *            {@link BleConstants#GATT_FORMAT_UINT24},
+     *            {@link BleConstants#GATT_FORMAT_UINT32},
+     *            {@link BleConstants#GATT_FORMAT_UINT48},
+     *            {@link BleConstants#GATT_FORMAT_UINT64},
+     *            {@link BleConstants#GATT_FORMAT_UINT128},
+     *            {@link BleConstants#GATT_FORMAT_SINT8},
+     *            {@link BleConstants#GATT_FORMAT_SINT12},
+     *            {@link BleConstants#GATT_FORMAT_SINT16},
+     *            {@link BleConstants#GATT_FORMAT_SINT24},
+     *            {@link BleConstants#GATT_FORMAT_SINT32},
+     *            {@link BleConstants#GATT_FORMAT_SINT48},
+     *            {@link BleConstants#GATT_FORMAT_SINT64},
+     *            {@link BleConstants#GATT_FORMAT_SINT128},
+     *            {@link BleConstants#GATT_FORMAT_FLOAT32},
+     *            {@link BleConstants#GATT_FORMAT_FLOAT64},
+     *            {@link BleConstants#GATT_FORMAT_SFLOAT},
+     *            {@link BleConstants#GATT_FORMAT_FLOAT},
+     *            {@link BleConstants#GATT_FORMAT_DUINT16},
+     *            {@link BleConstants#GATT_FORMAT_UTF8S},
+     *            {@link BleConstants#GATT_FORMAT_UTF16S},
+     *            {@link BleConstants#GATT_FORMAT_STRUCT},
+     *            {@link BleConstants#GATT_FORMAT_MAX}
+     */
     public void setValueFormat(int format)
     {
-        this.mFormat = format;
-        this.mIsFixed = true;
+        mFormat = format;
+        mIsFixed = true;
 
         switch (format) {
-            case 1:
-
-            case 2:
-
-            case 3:
-
-            case 4:
-
-            case 12:
-                this.mMaxLength = 1;
+            case BleConstants.GATT_FORMAT_BOOL:
+            case BleConstants.GATT_FORMAT_2BITS:
+            case BleConstants.GATT_FORMAT_NIBBLE:
+            case BleConstants.GATT_FORMAT_UINT8:
+            case BleConstants.GATT_FORMAT_SINT8:
+                mMaxLength = 1;
                 break;
-            case 5:
 
-            case 6:
-
-            case 13:
-
-            case 14:
-
-            case 22:
-                this.mMaxLength = 2;
+            case BleConstants.GATT_FORMAT_UINT12:
+            case BleConstants.GATT_FORMAT_UINT16:
+            case BleConstants.GATT_FORMAT_SINT12:
+            case BleConstants.GATT_FORMAT_SINT16:
+            case BleConstants.GATT_FORMAT_SFLOAT:
+                mMaxLength = 2;
                 break;
-            case 7:
-
-            case 15:
-                this.mMaxLength = 3;
+                
+            case BleConstants.GATT_FORMAT_UINT24:
+            case BleConstants.GATT_FORMAT_SINT24:
+                mMaxLength = 3;
                 break;
-            case 8:
-
-            case 16:
-
-            case 20:
-
-            case 23:
-
-            case 24:
-                this.mMaxLength = 4;
+                
+            case BleConstants.GATT_FORMAT_UINT32:
+            case BleConstants.GATT_FORMAT_SINT32:
+            case BleConstants.GATT_FORMAT_FLOAT32:
+            case BleConstants.GATT_FORMAT_FLOAT:
+            case BleConstants.GATT_FORMAT_DUINT16:
+                mMaxLength = 4;
                 break;
-            case 9:
-
-            case 17:
-                this.mMaxLength = 6;
+                
+            case BleConstants.GATT_FORMAT_UINT48:
+            case BleConstants.GATT_FORMAT_SINT48:
+                mMaxLength = 6;
                 break;
-            case 10:
-
-            case 18:
-
-            case 21:
-                this.mMaxLength = 8;
+                
+            case BleConstants.GATT_FORMAT_UINT64:
+            case BleConstants.GATT_FORMAT_SINT64:
+            case BleConstants.GATT_FORMAT_FLOAT64:
+                mMaxLength = 8;
                 break;
-            case 11:
-
-            case 19:
-                this.mMaxLength = 16;
+                
+            case BleConstants.GATT_FORMAT_UINT128:
+            case BleConstants.GATT_FORMAT_SINT128:
+                mMaxLength = 16;
                 break;
-            case 25:
-
-            case 26:
-
-            case 27:
-                this.mMaxLength = 100;
-                this.mIsFixed = false;
+                
+            case BleConstants.GATT_FORMAT_UTF8S:
+            case BleConstants.GATT_FORMAT_UTF16S:
+            case BleConstants.GATT_FORMAT_STRUCT:
+                mMaxLength = 100;
+                mIsFixed = false;
                 break;
+                
             default:
                 Log.e("BleAttribute", "Format not found");
-                this.mFormat = 0;
-                this.mMaxLength = 0;
-                this.mIsFixed = true;
+                mFormat = 0;
+                mMaxLength = 0;
+                mIsFixed = true;
         }
     }
 
+    /**
+     * Indicates whether the attribute uses a fixed-length value format.
+     */
     public boolean isFixedLength()
     {
-        return this.mIsFixed;
+        return mIsFixed;
     }
 
+    /**
+     * Returns the maximum length of the value represented in this attribute.
+     */
     public int getMaxLength()
     {
-        return this.mMaxLength;
+        return mMaxLength;
     }
 
+    /**
+     * Sets the maximum allowable length for the value in this attribute. This
+     * function should only be called for variable length attribute values.
+     * 
+     * @see {@link #isFixedLength()}
+     */
     public void setMaxLength(String maxSizeValString)
     {
-        if (!this.mIsFixed)
-            this.mMaxLength = Integer.parseInt(maxSizeValString, 16);
+        if (!mIsFixed)
+            mMaxLength = Integer.parseInt(maxSizeValString, 16);
         else
             Log.e("BleAttribute", "Format is fixed size. Ignore the MaxSize tag");
     }
 
+    /**
+     * Set the length of a variable length value. This value must not exceed the
+     * maximum allowable length.
+     * 
+     * @see {@link #getMaxLength()}
+     */
     public void setLength(int length)
     {
-        this.mLength = length;
+        mLength = length;
     }
 
+    /**
+     * Returns the length of the value for variable length value formats.
+     */
     public int getLength()
     {
-        return this.mLength;
+        return mLength;
     }
 
+    /**
+     * Gets the raw value bytes for this attribute.
+     */
     public byte[] getValue()
     {
-        if ((this.mLength > 0) && (this.mValue != null)) {
-            byte[] rValue = new byte[this.mLength];
-            System.arraycopy(this.mValue, 0, rValue, 0, this.mLength);
+        if ((mLength > 0) && (mValue != null)) {
+            byte[] rValue = new byte[mLength];
+            System.arraycopy(mValue, 0, rValue, 0, mLength);
             return rValue;
         }
         Log.i("BleAttribute", "the value is not supported so null is returned");
         return null;
     }
 
+    /**
+     * Gets the raw value byte for this attribute.
+     */
     public byte getValueByte()
     {
-        if ((this.mLength > 0) && (this.mValue != null)) {
-            return this.mValue[0];
+        if ((mLength > 0) && (mValue != null)) {
+            return mValue[0];
         }
 
         Log.i("BleAttribute", "the value is not initialized -1 is returned");
-        return -1;
+        return BleConstants.GATT_UNDEFINED;
     }
 
+    /**
+     * Gets the raw int value for this attribute.
+     */
     public int getValueInt()
     {
-        if ((this.mLength > 0) && (this.mValue != null)) {
+        if ((mLength > 0) && (mValue != null)) {
             int value = 0;
-            for (int i = 0; i < this.mLength; i++) {
-                int shift = (this.mLength - 1 - i) * 8;
-                value += ((this.mValue[i] & 0xFF) << shift);
+            for (int i = 0; i < mLength; i++) {
+                int shift = (mLength - 1 - i) * 8;
+                value += ((mValue[i] & 0xFF) << shift);
             }
             return value;
         }
@@ -225,61 +329,85 @@ public class BleAttribute
         return -1;
     }
 
+    /**
+     * Set the value for this attribute. These method signature can be used for
+     * char value and user description, Setting the value for this attribute
+     * marks this attribute as modified.
+     */
     public byte setValue(byte[] value)
     {
         int length = value.length;
-        if (length > this.mMaxLength) {
-            length = this.mMaxLength;
+        if (length > mMaxLength) {
+            length = mMaxLength;
         }
-        System.arraycopy(value, 0, this.mValue, 0, length);
-        this.mLength = length;
-        this.mDirty = true;
+        System.arraycopy(value, 0, mValue, 0, length);
+        mLength = length;
+        mDirty = true;
         return 0;
     }
 
+    /**
+     * Set the value for this attribute. These method signature can be used for
+     * client config, server config, unit, exponent, Setting the value for this
+     * attribute marks this attribute as modified.
+     */
     public byte setValue(int value)
     {
         int length = 4;
         byte[] valueByte = null;
 
-        if (length > this.mMaxLength) {
-            length = this.mMaxLength;
+        if (length > mMaxLength) {
+            length = mMaxLength;
             return -123;
         }
 
-        this.mLength = length;
+        mLength = length;
         valueByte = new byte[length];
-        
-        for (int i = 0; i < this.mLength; i++) {
-            int offset = (this.mLength - 1 - i) * 8;
+
+        for (int i = 0; i < mLength; i++) {
+            int offset = (mLength - 1 - i) * 8;
             valueByte[i] = (byte) (value >>> offset & 0xFF);
         }
 
-        System.arraycopy(valueByte, 0, this.mValue, 0, this.mLength);
-        this.mDirty = true;
+        System.arraycopy(valueByte, 0, mValue, 0, mLength);
+        mDirty = true;
 
         return 0;
     }
 
+    /**
+     * Set the value for this attribute. These method signature can be used for
+     * extended property Setting the value for this attribute marks this
+     * attribute as modified.
+     */
     public byte setValue(byte value)
     {
         int length = 1;
-        this.mValue[0] = value;
-        this.mLength = length;
-        this.mDirty = true;
+        mValue[0] = value;
+        mLength = length;
+        mDirty = true;
         return 0;
     }
 
+    /**
+     * Set the value of this attribute given a variable length value (ex.
+     * string).
+     */
     public byte setValue(byte[] value, int length)
     {
-        if (length > this.mMaxLength)
-            length = this.mMaxLength;
-        System.arraycopy(value, 0, this.mValue, 0, length);
-        this.mLength = length;
-        this.mDirty = true;
+        if (length > mMaxLength)
+            length = mMaxLength;
+        System.arraycopy(value, 0, mValue, 0, length);
+        mLength = length;
+        mDirty = true;
         return 0;
     }
 
+    /**
+     * Set the raw value bytes for this attribute starting at a given offset
+     * 
+     * @return {@link BleConstants#GATT_SUCCESS} if successful
+     */
     public byte setValue(byte[] value, int offset, int len, BleGattID gattUuid, int totalsize,
             String address)
     {
@@ -305,7 +433,7 @@ public class BleAttribute
             return 1;
         }
 
-        if (gattUuid.equals(this.mID)) {
+        if (gattUuid.equals(mID)) {
             Log.i("BleAttribute", "##Writing a attribute value..");
             Log.i("BleAttribute", "##offset=" + offset + " mMaxLength=" + this.mMaxLength
                     + " totalsize=" + totalsize);
@@ -331,81 +459,129 @@ public class BleAttribute
         return 0;
     }
 
+    /**
+     * Sets the encryption key size.
+     */
     public void setKeySize(int keySize)
     {
         this.mKeySize = keySize;
     }
 
+    /**
+     * Returns the permission bit mask.
+     */
     public int getPermMask()
     {
         return this.mPermissionMask;
     }
 
+    /**
+     * Set permission bit mask for this attribute.
+     */
     public void setPermMask(int permMask)
     {
         this.mPermissionMask = permMask;
         setPermission(permMask, this.mKeySize);
     }
 
+    /**
+     * Sets permissions including key size for this attribute.
+     */
     public void setPermission(int permMask, int keySize)
     {
         int tempKeySize = 0;
         if (keySize > 0) {
-            tempKeySize = keySize - 16;
+            tempKeySize = keySize - BleAttribute.DEFAULT_KEYSIZE;
         }
 
         tempKeySize <<= 12;
         this.mPermission = (tempKeySize | permMask);
     }
 
+    /**
+     * Returns the combined key size/attribute permission value for this
+     * attribute.
+     */
     public int getPermission()
     {
         return this.mPermission;
     }
 
+    /**
+     * Sets the level of authentication required to read/write this attribute.
+     */
     public void setAuthReq(byte AuthReq)
     {
         this.mAuthReq = AuthReq;
     }
 
+    /**
+     * Returns the level of authentication required to read or write this
+     * attribute.
+     */
     public byte getAuthReq()
     {
         return this.mAuthReq;
     }
 
+    /**
+     * Sets the write type for this attribute.
+     * 
+     * @param writeType {@link BleConstants#GATTC_TYPE_WRITE} or
+     *            {@link BleConstants#GATTC_TYPE_WRITE_NO_RSP}
+     */
     public void setWriteType(int writeType)
     {
         this.mWriteType = writeType;
     }
 
+    /**
+     * Returns whether this characteristic requires waiting for write operations
+     * to be acknowledged or not.
+     * 
+     * @see {@link #setWriteType(int)}
+     */
     public int getWriteType()
     {
         return this.mWriteType;
     }
 
+    /**
+     * Returns whether this attribute has been registered with the Bluetooth
+     * stack.
+     */
     public boolean isRegistered()
     {
         return this.mHandleMap.get(this.mID) != null;
     }
 
+    /**
+     * Maps an attribute of this attribute to a handle value.
+     * 
+     * @see {@link #getValueByHandle(int)}
+     */
     public void setHandle(int handle)
     {
         this.mHandle = handle;
     }
 
+    /**
+     * Returns a handle for this attribute ID.
+     */
     public int getHandle()
     {
-        if (this.mHandle >= 0) {
+        if (this.mHandle > BleConstants.GATT_UNDEFINED) {
             return this.mHandle;
         }
-        return -1;
+        return BleConstants.GATT_UNDEFINED;
     }
 
+    /**
+     * Returns an attribute based on a previously assigned handle value.
+     */
     public byte[] getValueByHandle(int handle)
     {
-        BleGattID gattUuid = null;
         if (this.mHandle == handle) {
-            gattUuid = this.mID;
             return this.mValue;
         }
         Log.w("BleAttribute", "Attribute UUID not found with handle " + handle);

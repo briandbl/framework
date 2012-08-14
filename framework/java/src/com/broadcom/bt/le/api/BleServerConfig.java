@@ -8,6 +8,9 @@ public class BleServerConfig extends BleDescriptor
         implements Parcelable
 {
     private static final String TAG = "BleServerConfig";
+    @SuppressWarnings({
+            "rawtypes", "unchecked"
+    })
     public static final Parcelable.Creator<BleServerConfig> CREATOR = new Parcelable.Creator()
     {
         public BleServerConfig createFromParcel(Parcel source) {
@@ -27,7 +30,7 @@ public class BleServerConfig extends BleDescriptor
     }
 
     public BleServerConfig() {
-        super(new BleGattID(10499));
+        super(new BleGattID(BleConstants.GATT_UUID_CHAR_SRVR_CONFIG16));
     }
 
 }

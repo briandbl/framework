@@ -12,102 +12,101 @@ import com.broadcom.bt.le.api.IBleProfileEventCallback;
 
 interface IBluetoothGatt {
 
-	void registerApp(in BluetoothGattID paramBluetoothGattID,
-                     in IBleClientCallback paramIBleClientCallback);
+	void registerApp(in BluetoothGattID appUuid,
+                     in IBleClientCallback callback);
 
-    void unregisterApp(byte paramByte);
+    void unregisterApp(byte interfaceID);
 
-    void setEncryption(in String paramString, byte paramByte);
+    void setEncryption(in String address, byte action);
 
-    void setScanParameters(int p1, int p2);
+    void setScanParameters(int scanInterval, int scanWindow);
 
     void filterEnable(boolean p);
 
-    void filterEnableBDA(boolean p, int i, in String s);
+    void filterEnableBDA(boolean enable, int addr_type, in String address);
 
     void clearManufacturerData();
 
-    void filterManufacturerData(int paramInt, 
-                                in byte[] paramArrayOfByte1,
-                                in byte[] paramArrayOfByte2, 
-                                in byte[] paramArrayOfByte3, 
-                                in byte[] paramArrayOfByte4);
+    void filterManufacturerData(int company, 
+                                in byte[] data1,
+                                in byte[] data2, 
+                                in byte[] data3, 
+                                in byte[] data4);
 
-    void filterManufacturerDataBDA(int paramInt1, 
-                                   in byte[] paramArrayOfByte1,
-                                   in byte[] paramArrayOfByte2, 
-                                   in byte[] paramArrayOfByte3, 
-                                   in byte[] paramArrayOfByte4,
-                                   boolean paramBoolean, 
-                                   int paramInt2,
-                                   in String paramString);
+    void filterManufacturerDataBDA(int company, 
+                                   in byte[] data1,
+                                   in byte[] data2, 
+                                   in byte[] data3, 
+                                   in byte[] data4,
+                                   boolean has_bda, 
+                                   int addr_type,
+                                   in String address);
 
-    void observe(boolean paramBoolean, 
-                 int paramInt);
+    void observe(boolean start, 
+                 int duration);
 
-    void open(byte paramByte, 
-              in String paramString, 
-              boolean paramBoolean);
+    void open(byte interfaceID, 
+              in String remote, 
+              boolean foreground);
 
-    void close(byte paramByte, 
-               in String paramString, 
-               int paramInt,
-               boolean paramBoolean);
+    void close(byte interfaceID, 
+               in String remote, 
+               int clientID,
+               boolean foreground);
 
-    void registerServiceDataCallback(
-                                     int paramInt,
-                                     in BluetoothGattID id, 
-                                     in String paramString,
-                                     in IBleCharacteristicDataCallback cb);
+    void registerServiceDataCallback(int connID,
+                                     in BluetoothGattID serviceID, 
+                                     in String address,
+                                     in IBleCharacteristicDataCallback callback);
 
-    void searchService(int paramInt, 
-                       in BluetoothGattID id);
+    void searchService(int connID, 
+                       in BluetoothGattID serviceID);
 
-    void getFirstChar(int paramInt, 
-                      in BluetoothGattID id1,
-                      in BluetoothGattID id2);
+    void getFirstChar(int connID, 
+                      in BluetoothGattID serviceID,
+                      in BluetoothGattID id);
     
-    void getNextChar(int paramInt,
+    void getNextChar(int connID,
                      in BluetoothGattCharID charID, 
-                     in BluetoothGattID ID);
+                     in BluetoothGattID id);
 
-    void getFirstCharDescr(int paramInt,
-                           in BluetoothGattCharID CharID, 
-                           in BluetoothGattID ID);
+    void getFirstCharDescr(int connID,
+                           in BluetoothGattCharID charID, 
+                           in BluetoothGattID id);
 
-    void getNextCharDescr(int paramInt,
-                          in BluetoothGattCharDescrID CharDescrID,
-                          in BluetoothGattID ID);
+    void getNextCharDescr(int connID,
+                          in BluetoothGattCharDescrID charDescrID,
+                          in BluetoothGattID id);
 
-    void getFirstIncludedService(int paramInt,
-                                 in BluetoothGattID id1, 
+    void getFirstIncludedService(int connID,
+                                 in BluetoothGattID serviceID, 
                                  in BluetoothGattID id2);
 
-    void getNextIncludedService(int paramInt,
-                                in BluetoothGattInclSrvcID SrvcID,
+    void getNextIncludedService(int connID,
+                                in BluetoothGattInclSrvcID includedServiceID,
                                 in BluetoothGattID id);
 
-    void readChar(int paramInt, 
+    void readChar(int connID, 
                   in BluetoothGattCharID charID,
-                  byte paramByte);
+                  byte authReq);
 
-    void readCharDescr(int paramInt,
-                       in BluetoothGattCharDescrID charDesc, 
-                       byte paramByte);
+    void readCharDescr(int connID,
+                       in BluetoothGattCharDescrID charDescID, 
+                       byte authReq);
 
-    void writeCharValue(int paramInt1,
+    void writeCharValue(int connID,
                         in BluetoothGattCharID CharID, 
-                        int paramInt2, 
-                        byte paramByte,
-                        in byte[] paramArrayOfByte);
+                        int writeType, 
+                        byte authReq,
+                        in byte[] value);
 
-    void writeCharDescrValue(int paramInt1,
+    void writeCharDescrValue(int connID,
                              in BluetoothGattCharDescrID descID, 
-                             int paramInt2, 
-                             byte paramByte,
-                             in byte[] paramArrayOfByte);
-
-    void sendIndConfirm(int paramInt,
+                             int writeType, 
+                             byte authReq,
+                             in byte[] value);
+                             
+    void sendIndConfirm(int connID,
                         in BluetoothGattCharID charID);
 
     void prepareWrite(int paramInt1,
@@ -119,12 +118,12 @@ interface IBluetoothGatt {
     void executeWrite(int paramInt, 
                       boolean paramBoolean);
 
-    void registerForNotifications(byte paramByte, 
-                                  in String paramString,
+    void registerForNotifications(byte interfaceID, 
+                                  in String address,
                                   in BluetoothGattCharID charID);
 
-    void deregisterForNotifications(byte paramByte, 
-                                    in String paramString,
+    void deregisterForNotifications(byte interfaceID, 
+                                    in String address,
                                     in BluetoothGattCharID charID);
 
     void registerServerServiceCallback(in BluetoothGattID id1,

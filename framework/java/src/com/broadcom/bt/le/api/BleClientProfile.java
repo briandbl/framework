@@ -17,6 +17,19 @@ import com.broadcom.bt.service.gatt.IBluetoothGatt;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * Abstract base class, representing a Bluetooth LE Client Profile. <br>
+ * <br>
+ * To implement a new low energy profile, an application must extend this class,
+ * initialize it with the desired profile ID and the necessary required or
+ * optional services. <br>
+ * <br>
+ * Included services are represented by overriding the BleClientService class. <br>
+ * <br>
+ * Once this class has been extended for the desired profile, an application may
+ * call the connect(BluetoothDevice) or connectBackground(BluetoothDevice)
+ * functions to initiate an active or passive connection to the remote device.
+ */
 public abstract class BleClientProfile
 {
     private static final boolean D = true;
@@ -27,7 +40,7 @@ public abstract class BleClientProfile
     private ArrayList<BluetoothDevice> mConnectingDevices;
     private ArrayList<BluetoothDevice> mDisconnectingDevices;
     private BleGattID mAppUuid;
-    private byte mClientIf = 0;
+    private byte mClientIf = BleConstants.GATT_SERVICE_PRIMARY;
     private IBluetoothGatt mService;
     private BleClientCallback mCallback;
     private HashMap<Integer, BluetoothDevice> mClientIDToDeviceMap;
@@ -36,6 +49,13 @@ public abstract class BleClientProfile
     private GattServiceConnection mSvcConn;
     private Context mContext;
 
+    /**
+     * Creates a BlueClientProfile given this profile's UUID and client
+     * application context.
+     * 
+     * @param context Application context used to bind the GATT service.
+     * @param profileUuid Unique UUID identifying the profile to be implemented.
+     */
     public BleClientProfile(Context context, BleGattID profileUuid)
     {
         Log.d("BleClientProfile", "BleClientProfile " + profileUuid.toString());
@@ -43,17 +63,29 @@ public abstract class BleClientProfile
         this.mContext = context;
         this.mAppUuid = profileUuid;
 
-        this.mConnectedDevices = new ArrayList();
-        this.mConnectingDevices = new ArrayList();
-        this.mDisconnectingDevices = new ArrayList();
+        this.mConnectedDevices = new ArrayList<BluetoothDevice>();
+        this.mConnectingDevices = new ArrayList<BluetoothDevice>();
+        this.mDisconnectingDevices = new ArrayList<BluetoothDevice>();
 
-        this.mClientIDToDeviceMap = new HashMap();
-        this.mDeviceToClientIDMap = new HashMap();
+        this.mClientIDToDeviceMap = new HashMap<Integer, BluetoothDevice>();
+        this.mDeviceToClientIDMap = new HashMap<BluetoothDevice, Integer>();
 
         this.mCallback = new BleClientCallback();
         this.mSvcConn = new GattServiceConnection(null);
     }
 
+    /**
+     * Initializes this BleClientProfile object. Takes an array of required
+     * services and optional services and saves it in the object for
+     * verification when peer connection is made.
+     * 
+     * @param requiredServices {@link ArrayList} of {@link BleClientService}
+     *            derived objects indicating the services required for this
+     *            profile to function correctly.
+     * @param optionalServices {@link ArrayList} of {@link BleClientService}
+     *            derived objects indicating the optional services that profile
+     *            might need.
+     */
     public void init(ArrayList<BleClientService> requiredServices,
             ArrayList<BleClientService> optionalServices)
     {
@@ -68,6 +100,9 @@ public abstract class BleClientProfile
         this.mContext.bindService(i, this.mSvcConn, 1);
     }
 
+    /**
+     * Cleans up resources associated with this profile.
+     */
     public synchronized void finish()
     {
         if (this.mSvcConn != null) {
@@ -76,41 +111,58 @@ public abstract class BleClientProfile
         }
     }
 
+    @Override
     public void finalize()
     {
         finish();
     }
 
+    /**
+     * Returns whether this profile has been successfully registered with the
+     * Bluetooth stack.
+     * 
+     * @see {@link #registerProfile()}
+     */
     public boolean isProfileRegistered()
     {
         Log.d("BleClientProfile", "isProfileRegistered (" + this.mAppUuid + ")");
-        return this.mClientIf != 0;
+        return this.mClientIf != BleConstants.GATT_SERVICE_PRIMARY;
     }
 
+    /**
+     * Registers this profile with the Bluetooth stack.
+     * 
+     * @return {@link BleConstants#GATT_SUCCESS} if the profile was successfully
+     *         registered or {@link BleConstants#SERVICE_UNAVAILABLE} if the
+     *         profile has already been registered by another application.
+     */
     public int registerProfile()
     {
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         Log.d("BleClientProfile", "registerProfile (" + this.mAppUuid + ")");
 
-        if (this.mClientIf == 0)
+        if (this.mClientIf == BleConstants.GATT_SERVICE_PRIMARY)
         {
             try
             {
                 this.mService.registerApp(this.mAppUuid, this.mCallback);
             } catch (RemoteException e) {
                 Log.e("BleClientProfile", e.toString());
-                ret = 1;
+                ret = BleConstants.SERVICE_UNAVAILABLE;
             }
         }
 
         return ret;
     }
 
+    /**
+     * Unregister this profile with the Bluetooth stack.
+     */
     public void deregisterProfile()
     {
         Log.d("BleClientProfile", "deregisterProfile (" + this.mAppUuid + ")");
 
-        if (this.mClientIf != 0)
+        if (this.mClientIf != BleConstants.GATT_SERVICE_PRIMARY)
             try {
                 this.mService.unregisterApp(this.mClientIf);
             } catch (RemoteException e) {
@@ -118,6 +170,14 @@ public abstract class BleClientProfile
             }
     }
 
+    /**
+     * Sets the desired encryption level for an active connection. This function
+     * should only be called after a connection to a remote device has been
+     * established.
+     * 
+     * @param device Remote device with a currently active
+     * @param action Encryption level for the active connection
+     */
     public void setEncryption(BluetoothDevice device, byte action)
     {
         try
@@ -128,6 +188,13 @@ public abstract class BleClientProfile
         }
     }
 
+    /**
+     * Defines how aggressive the local devices scans for remote LE devices when
+     * a background connection has been requested.
+     * 
+     * @param scanInterval
+     * @param scanWindow
+     */
     public void setScanParameters(int scanInterval, int scanWindow)
     {
         try
@@ -138,11 +205,21 @@ public abstract class BleClientProfile
         }
     }
 
+    /**
+     * Initiates a GATT connection to the remote device. If the connection is
+     * established successfully, remote services are enumerated automatically.
+     * 
+     * @param device remote Bluetooth device
+     * @return {@link BleConstants#GATT_SUCCESS} if the connection is initiated
+     *         successfully.
+     * @see {@link #onDeviceConnected(BluetoothDevice)},
+     *      {@link #disconnect(BluetoothDevice)}
+     */
     public int connect(BluetoothDevice device)
     {
         Log.d("BleClientProfile", "connect (" + this.mAppUuid + ")" + device.getAddress());
 
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
 
         synchronized (this.mConnectingDevices) {
             this.mConnectingDevices.add(device);
@@ -156,18 +233,34 @@ public abstract class BleClientProfile
             this.mService.open(this.mClientIf, device.getAddress(), true);
         } catch (RemoteException e) {
             Log.e("BleClientProfile", e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /**
+     * Prepares a background connection to a remote Bluetooth device. <br>
+     * <br>
+     * A background connection allows the remote device to initiate a connection
+     * to this profile. After calling
+     * {@link #connectBackground(BluetoothDevice)}, the local device will
+     * periodically scan for incoming connections from the specified device. An
+     * application must call
+     * {@link #cancelBackgroundConnection(BluetoothDevice)} to stop scanning.
+     * 
+     * @see {@link #onDeviceConnected(BluetoothDevice)},
+     *      {@link #cancelBackgroundConnection(BluetoothDevice)}
+     * @param device remote device
+     * @return {@link BleConstants#GATT_SUCCESS} or
+     *         {@link BleConstants#GATT_ERROR}
+     */
     public int connectBackground(BluetoothDevice device)
     {
         Log.d("BleClientProfile",
                 "connectBackground (" + this.mAppUuid + ")" + device.getAddress());
 
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
 
         synchronized (this.mConnectingDevices) {
             this.mConnectingDevices.add(device);
@@ -181,29 +274,43 @@ public abstract class BleClientProfile
             this.mService.open(this.mClientIf, device.getAddress(), false);
         } catch (RemoteException e) {
             Log.e("BleClientProfile", e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /**
+     * Stops listening for connection attempts initiated by a remote device.
+     * 
+     * @param device remote Bluetooth device
+     * @return {@link BleConstants#GATT_SUCCESS} or
+     *         {@link BleConstants#GATT_ERROR}.
+     */
     public int cancelBackgroundConnection(BluetoothDevice device)
     {
         Log.d("BleClientProfile", "cancelBackgroundConnection (" + this.mAppUuid
                 + ") - device " + device.getAddress());
 
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         try
         {
             this.mService.close(this.mClientIf, device.getAddress(), 0, false);
         } catch (RemoteException e) {
             Log.e("BleClientProfile", e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /**
+     * Disconnects an established GATT connection to a remote device.
+     * 
+     * @param device Bluetooth device
+     * @return {@link BleConstants#GATT_SUCCESS} or
+     *         {@link BleConstants#GATT_ERROR}.
+     */
     public int disconnect(BluetoothDevice device)
     {
         Log.d("BleClientProfile",
@@ -213,18 +320,29 @@ public abstract class BleClientProfile
             this.mDisconnectingDevices.add(device);
         }
 
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         try
         {
-            this.mService.close(this.mClientIf, device.getAddress(),
-                    ((Integer) this.mDeviceToClientIDMap.get(device)).intValue(), true);
+            this.mService.close(this.mClientIf, 
+                    device.getAddress(),
+                    ((Integer) this.mDeviceToClientIDMap.get(device)).intValue(), 
+                    true);
         } catch (RemoteException e) {
             Log.e("BleClientProfile", e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
         return ret;
     }
 
+    /**
+     * Refreshes this client profile. For each service included in the profile,
+     * all the characteristics are retrieved and read.
+     * 
+     * @see {@link BleClientService#refresh(BluetoothDevice)}
+     * @param device remote device
+     * @return {@link BleConstants#GATT_SUCCESS} or
+     *         {@link BleConstants#GATT_ERROR}.
+     */
     public int refresh(BluetoothDevice device)
     {
         Log.d("BleClientProfile",
@@ -233,14 +351,19 @@ public abstract class BleClientProfile
         if (isDeviceDisconnecting(device)) {
             Log.d("BleClientProfile", "refresh (" + this.mAppUuid
                     + ") - Device unavailable!");
-            return 1;
+            return BleConstants.GATT_ERROR;
         }
 
-        ((BleClientService) this.mRequiredServices.get(0)).refresh(device);
+        ((BleClientService) this.mRequiredServices.get(
+                BleConstants.GATT_SERVICE_PRIMARY)).refresh(device);
 
-        return 0;
+        return BleConstants.GATT_SUCCESS;
     }
 
+    /**
+     * Refreshes a specific service included in this profile. Gets all the
+     * characteristics and values for this service.
+     */
     public int refreshService(BluetoothDevice device, BleClientService service)
     {
         Log.d("BleClientProfile", "refreshService (" + this.mAppUuid + ") address = s "
@@ -249,11 +372,25 @@ public abstract class BleClientProfile
         return 0;
     }
 
+    /**
+     * Returns an array of all remote devices currently connected to this
+     * profile.
+     * 
+     * @return array of {@link BluetoothDevice}
+     */
     public BluetoothDevice[] getConnectedDevices()
     {
         return (BluetoothDevice[]) this.mConnectedDevices.toArray(new BluetoothDevice[0]);
     }
 
+    /**
+     * Looks up a given Bluetooth device address in the list of connected
+     * devices. Returns a {@link BluetoothDevice} object if the remote device is
+     * connected or null if the device could not be found.
+     * 
+     * @param address remote device
+     * @return {@link BluetoothDevice} or null
+     */
     public BluetoothDevice findConnectedDevice(String address)
     {
         BluetoothDevice ret = null;
@@ -269,11 +406,25 @@ public abstract class BleClientProfile
         return ret;
     }
 
+    /**
+     * Returns an array of remote devices that are currently connecting or
+     * awaiting a connection.
+     * 
+     * @see {@link #connectBackground(BluetoothDevice)}
+     */
     public BluetoothDevice[] getPendingConnections()
     {
         return (BluetoothDevice[]) this.mConnectingDevices.toArray(new BluetoothDevice[0]);
     }
 
+    /**
+     * Find a remote device, given its Bluetooth device address, in the list of
+     * devices awaiting a connection.
+     * 
+     * @see {@link #connectBackground(BluetoothDevice)}
+     * @param address remote address
+     * @return {@link BluetoothDevice} or null
+     */
     public BluetoothDevice findDeviceWaitingForConnection(String address)
     {
         BluetoothDevice ret = null;
@@ -289,11 +440,20 @@ public abstract class BleClientProfile
         return ret;
     }
 
+    /**
+     * @hide
+     * @return
+     */
     IBluetoothGatt getGattService()
     {
         return this.mService;
     }
 
+    /**
+     * @hide
+     * @param d
+     * @return
+     */
     int getConnIdForDevice(BluetoothDevice d)
     {
         if (!this.mDeviceToClientIDMap.containsKey(d)) {
@@ -303,20 +463,33 @@ public abstract class BleClientProfile
         return ((Integer) this.mDeviceToClientIDMap.get(d)).intValue();
     }
 
+    /**
+     * @hide
+     * @return
+     */
     byte getClientIf()
     {
         return this.mClientIf;
     }
 
+    /**
+     * @hide
+     * @param connId
+     * @return
+     */
     BluetoothDevice getDeviceforConnId(int connId)
     {
         return (BluetoothDevice) this.mClientIDToDeviceMap.get(new Integer(connId));
     }
 
+    /** @hide */
     boolean isDeviceDisconnecting(BluetoothDevice device) {
         return this.mDisconnectingDevices.indexOf(device) != -1;
     }
 
+    /**
+     * @hide
+     */
     void onServiceRefreshed(BleClientService s, BluetoothDevice device)
     {
         int i = this.mRequiredServices.indexOf(s);
@@ -328,6 +501,14 @@ public abstract class BleClientProfile
         }
     }
 
+    /**
+     * Callback invoked when the profile has been initialized and has
+     * successfully connected to the GATT service. The default behaviour of this
+     * function is to call {@link #registerProfile()} next.
+     * 
+     * @see {@link #init(ArrayList, ArrayList)}, {@link #registerProfile()}
+     * @param success
+     */
     public void onInitialized(boolean success)
     {
         Log.d("BleClientProfile", "onInitialized");
@@ -335,27 +516,65 @@ public abstract class BleClientProfile
             registerProfile();
     }
 
+    /**
+     * Called when the profile has been registered with the Bluetooth stack.
+     * After this callback has been invoked, the application is ready to receive
+     * {@param #onDeviceConnected(BluetoothDevice)}, {@param
+     * #onDeviceDisconnected(BluetoothDevice)} and related callbacks.
+     * 
+     * @see {@link #registerProfile()}
+     */
     public void onProfileRegistered()
     {
         Log.d("BleClientProfile", "onProfileRegistered");
     }
 
+    /**
+     * Invoked when a profile has been de-registered from the Bluetooth stack.
+     * 
+     * @see {@link #deregisterProfile()}
+     */
     public void onProfileDeregistered()
     {
         Log.d("BleClientProfile", "onProfileDeregistered");
     }
 
+    /**
+     * Invoked when a remote device has connected to this profile. This callback
+     * may be triggered when a remote device is connected directly using the
+     * {@link #connect(BluetoothDevice)} function or when a remote device
+     * initiates a connection to the local device. By default, this function
+     * refreshes the services on the remote device.
+     * 
+     * @see {@link #connect(BluetoothDevice)},
+     *      {@link #connectBackground(BluetoothDevice)},
+     *      {@link #refresh(BluetoothDevice)}
+     * @param device Identifies the remote the device that got connected.
+     */
     public void onDeviceConnected(BluetoothDevice device)
     {
         Log.d("BleClientProfile", "onDeviceConnected");
         refresh(device);
     }
 
+    /**
+     * Called when the profile is disconnected from the peer.
+     * 
+     * @param device Identifies the remote the device that is no longer
+     *            connected.
+     * @see {@link #disconnect(BluetoothDevice)}
+     */
     public void onDeviceDisconnected(BluetoothDevice device)
     {
         Log.d("BleClientProfile", "onDeviceDisconnected");
     }
 
+    /**
+     * Callback triggered when the profile has refreshed all the services and
+     * updated all characteristics.
+     * 
+     * @see {@link #refresh(BluetoothDevice)}
+     */
     public void onRefreshed(BluetoothDevice device)
     {
         Log.d("BleClientProfile", "onRefreshed");
@@ -424,7 +643,7 @@ public abstract class BleClientProfile
             Log.d("BleClientProfile", "BleClientCallback::onAppDeregistered ("
                     + BleClientProfile.this.mAppUuid + ") client_if = " + client_if);
 
-            BleClientProfile.this.mClientIf = 0;
+            BleClientProfile.this.mClientIf = BleConstants.GATT_SERVICE_PRIMARY;
             BleClientProfile.this.onProfileDeregistered();
         }
 
@@ -451,10 +670,10 @@ public abstract class BleClientProfile
                 }
             }
 
-            if (d.getBondState() == 12) {
+            if (d.getBondState() == BluetoothDevice.BOND_BONDED) {
                 Log.d("BleClientProfile",
                         "onConnected device is bonded start encrypt the  link");
-                BleClientProfile.this.setEncryption(d, (byte)1);
+                BleClientProfile.this.setEncryption(d, (byte) 1);
             }
             BleClientProfile.this.mClientIDToDeviceMap.put(new Integer(connID), d);
             BleClientProfile.this.mDeviceToClientIDMap.put(d, new Integer(connID));

@@ -8,10 +8,16 @@ import com.broadcom.bt.service.gatt.BluetoothGattID;
 
 import java.util.UUID;
 
+/**
+ * Identifies a Bluetooth GATT characteristic or attribute.
+ */
 public final class BleGattID extends BluetoothGattID
         implements Parcelable
 {
     private static final String BASE_UUID_TPL = "%08x-0000-1000-8000-00805f9b34fb";
+    @SuppressWarnings({
+            "rawtypes", "unchecked"
+    })
     public static final Parcelable.Creator<BleGattID> CREATOR = new Parcelable.Creator() {
         public BleGattID createFromParcel(Parcel source) {
             int instId = source.readInt();
@@ -98,10 +104,13 @@ public final class BleGattID extends BluetoothGattID
         super(uuid);
     }
 
+    /**
+     * Get the UUID type represented by this BleGattID (16 or 128 bit).
+     */
     public UUID getUuid() {
-        if (getUuidType() == 16)
+        if (getUuidType() == BleConstants.GATT_UUID_TYPE_128)
             return super.getUuid();
-        return UUID.fromString(String.format("%08x-0000-1000-8000-00805f9b34fb",
+        return UUID.fromString(String.format(BASE_UUID_TPL,
                 new Object[] {
                     Integer.valueOf(getUuid16())
                 }));

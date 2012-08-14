@@ -1,7 +1,12 @@
 
 package com.broadcom.bt.le.api;
 
-public class BleConstants
+/**
+ * Contains a collection of GATT related constants used by Bluetooth Low Energy
+ * profiles and services. This is a purely static class containing the constant
+ * definitions.
+ */
+public abstract class BleConstants
 {
     public static final int GATT_UNDEFINED = -1;
     public static final int GATT_SERVICE_CREATION_SUCCESS = 0;

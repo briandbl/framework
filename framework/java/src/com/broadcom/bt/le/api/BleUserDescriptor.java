@@ -4,10 +4,16 @@ package com.broadcom.bt.le.api;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+/**
+ * Class representign a user defined descriptor.
+ */
 public class BleUserDescriptor extends BleDescriptor
         implements Parcelable
 {
     private static final String TAG = "BleUserDescriptor";
+    @SuppressWarnings({
+            "rawtypes", "unchecked"
+    })
     public static final Parcelable.Creator<BleUserDescriptor> CREATOR = new Parcelable.Creator()
     {
         public BleUserDescriptor createFromParcel(Parcel source) {

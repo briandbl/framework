@@ -1,8 +1,8 @@
 package com.broadcom.bt.le.api;
 
 interface IBleProfileEventCallback {
-    void onClientConnected(int paramInt, in String paramString,
-                           boolean paramBoolean);
-    void onAppRegisterCompleted(int paramInt1, int paramInt2);
+    void onClientConnected(int connId, in String address,
+                           boolean isConnected);
+    void onAppRegisterCompleted(int status, int serIf);
 
 }

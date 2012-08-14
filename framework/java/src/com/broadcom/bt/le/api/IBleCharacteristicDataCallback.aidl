@@ -3,76 +3,76 @@ package com.broadcom.bt.le.api;
 import com.broadcom.bt.service.gatt.BluetoothGattID;
 
 interface IBleCharacteristicDataCallback {
-    void onGetFirstCharacteristic(int paramInt1, 
-                                  int paramInt2,
-                                  in BluetoothGattID id1,
-                                  in BluetoothGattID id2);
+    void onGetFirstCharacteristic(int connID, 
+                                  int status,
+                                  in BluetoothGattID svcId,
+                                  in BluetoothGattID charId);
 
-    void onGetFirstCharacteristicDescriptor(int paramInt1, 
-                                   int paramInt2,
-                                   in BluetoothGattID id1,
-                                   in BluetoothGattID id2,
-                                   in BluetoothGattID id3);
+    void onGetFirstCharacteristicDescriptor(int connId, 
+                                   int status,
+                                   in BluetoothGattID svcId,
+                                   in BluetoothGattID charId,
+                                   in BluetoothGattID descId);
 
-    void onGetNextCharacteristic(int paramInt1, 
-                                 int paramInt2,
-                                 in BluetoothGattID id1, 
-                                 in BluetoothGattID id2);
+    void onGetNextCharacteristic(int connId, 
+                                 int status,
+                                 in BluetoothGattID svcId, 
+                                 in BluetoothGattID charId);
 
-    void onGetNextCharacteristicDescriptor(int paramInt1, 
-                                           int paramInt2,
-                                           in BluetoothGattID id1,
-                                           in BluetoothGattID id2,
-                                           in BluetoothGattID id3);
+    void onGetNextCharacteristicDescriptor(int connId, 
+                                           int status,
+                                           in BluetoothGattID svcId,
+                                           in BluetoothGattID charId,
+                                           in BluetoothGattID descId);
 
-    void onReadCharacteristicValue(int paramInt1, 
-                                   int paramInt2,
-                                   in BluetoothGattID id1, 
-                                   in BluetoothGattID id2,
-                                   in byte[] paramArrayOfByte);
+    void onReadCharacteristicValue(int connId, 
+                                   int status,
+                                   in BluetoothGattID svcId, 
+                                   in BluetoothGattID charId,
+                                   in byte[] data);
 
-    void onReadCharDescriptorValue(int paramInt1, 
-                                   int paramInt2,
-                                   in BluetoothGattID id1, 
-                                   in BluetoothGattID id2,
-                                   in BluetoothGattID id3, 
-                                   in byte[] paramArrayOfByte);
+    void onReadCharDescriptorValue(int connId, 
+                                   int status,
+                                   in BluetoothGattID svcId, 
+                                   in BluetoothGattID charId,
+                                   in BluetoothGattID descId, 
+                                   in byte[] data);
 
-    void onWriteCharValue(int paramInt1, 
-                          int paramInt2,
-                          in BluetoothGattID id1, 
-                          in BluetoothGattID id2);
+    void onWriteCharValue(int connId, 
+                          int status,
+                          in BluetoothGattID svcId, 
+                          in BluetoothGattID charId);
 
-    void onWriteCharDescrValue(int paramInt1, 
-                               int paramInt2,
-                               in BluetoothGattID id1, 
-                               in BluetoothGattID id2,
-                               in BluetoothGattID id3);
+    void onWriteCharDescrValue(int connId, 
+                               int status,
+                               in BluetoothGattID svcId, 
+                               in BluetoothGattID charId,
+                               in BluetoothGattID descId);
 
-    void onRegForNotifications(int paramInt1, 
-                               int paramInt2,
-                               in BluetoothGattID id1, 
-                               in BluetoothGattID id2);
+    void onRegForNotifications(int connId, 
+                               int status,
+                               in BluetoothGattID svcId, 
+                               in BluetoothGattID charId);
 
-    void onUnregisterNotifications(int paramInt1, 
-                                   int paramInt2,
-                                   in BluetoothGattID id1, 
-                                   in BluetoothGattID id2);
+    void onUnregisterNotifications(int connId, 
+                                   int status,
+                                   in BluetoothGattID svcId, 
+                                   in BluetoothGattID charId);
 
-    void onNotify(int paramInt, 
-                  in String paramString,
-                  in BluetoothGattID id1, 
-                  in BluetoothGattID id2,
-                  boolean paramBoolean, 
-                  in byte[] paramArrayOfByte);
+    void onNotify(int connId, 
+                  in String address,
+                  in BluetoothGattID svcId, 
+                  in BluetoothGattID charId,
+                  boolean isNotify, 
+                  in byte[] data);
 
-    void onGetFirstIncludedService(int paramInt1, 
-                                   int paramInt2,
-                                   in BluetoothGattID id1, 
-                                   in BluetoothGattID id2);
+    void onGetFirstIncludedService(int connId, 
+                                   int status,
+                                   in BluetoothGattID svcId, 
+                                   in BluetoothGattID charId);
 
-    void onGetNextIncludedService(int paramInt1, 
-                                  int paramInt2,
-                                  in BluetoothGattID id1, 
-                                  in BluetoothGattID id2);
+    void onGetNextIncludedService(int connId, 
+                                  int status,
+                                  in BluetoothGattID svcId, 
+                                  in BluetoothGattID charId);
 }

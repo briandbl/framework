@@ -13,120 +13,168 @@ import com.broadcom.bt.service.gatt.BluetoothGattInclSrvcID;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * Represents a low energy service in the client role. <br>
+ * <br>
+ * This is a base class implementing a BLE service, that an application should
+ * override to implement a new service. A client service is identified by a
+ * unique UUID and provides access to characteristics and descriptors provided
+ * by a remote device. <br>
+ * <br>
+ * A BleClientService derived service is usually assigned to a
+ * {@link BleClientProfile} as a required or optional service.
+ * 
+ * @author manuel
+ */
 public abstract class BleClientService
 {
     private static String TAG = "BleClientService";
 
     private BleClientProfile mProfile = null;
     private BleGattID mServiceId = null;
-    private HashMap<BluetoothDevice, ArrayList<ServiceData>> mdeviceToDataMap = new HashMap();
-    private BleCharacteristicDataCallback mCallback = new BleCharacteristicDataCallback();
+    private HashMap<BluetoothDevice, ArrayList<ServiceData>> mdeviceToDataMap =
+            new HashMap<BluetoothDevice, ArrayList<ServiceData>>();
+    private BleCharacteristicDataCallback mCallback =
+            new BleCharacteristicDataCallback();
     private boolean mReadDescriptors = true;
 
+    /**
+     * Creates a new Bluetooth Low Energy service identified by the given UUID.
+     * 
+     * @param serviceId
+     */
     public BleClientService(BleGattID serviceId)
     {
-        this.mServiceId = serviceId;
-        if (this.mServiceId.getServiceType() == -1)
-            this.mServiceId.setServiceType(0);
+        mServiceId = serviceId;
+        if (mServiceId.getServiceType() == BleConstants.GATT_UNDEFINED)
+            mServiceId.setServiceType(BleConstants.GATT_SERVICE_PRIMARY);
     }
 
+    /**
+     * Returns the UUID of this service.
+     */
     public BleGattID getServiceId()
     {
-        return this.mServiceId;
+        return mServiceId;
     }
 
+    /**
+     * Writes to a characteristic on a remote device. <br>
+     * <br>
+     * This function determines if the characteristic have been modified and
+     * issues the necessary write commands. <br>
+     * <br>
+     * Once the characteristic write completes, the
+     * onWriteCharacteristicComplete callback is invoked.
+     * 
+     * @param remoteDevice Identifies the remote device to write to.
+     * @param instanceId - Instance id of this service.
+     * @param characteristic - Characteristic to be written
+     * @return BleConstants.GATT_SUCCESS if the write operation was initiated
+     *         successfully
+     * @see {@link #onWriteCharacteristicComplete(int, BluetoothDevice, BleCharacteristic)}
+     */
     public int writeCharacteristic(BluetoothDevice remoteDevice, int instanceId,
             BleCharacteristic characteristic)
     {
         Log.d(TAG, "writeCharacteristic");
 
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
 
-        if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) == 65535) {
-            return 1;
+        if ((connID = mProfile.getConnIdForDevice(remoteDevice)) == BleConstants.GATT_INVALID_CONN_ID) {
+            return BleConstants.GATT_INVALID_CONN_ID;
         }
         ServiceData s = getServiceData(remoteDevice, instanceId);
-        if (s != null)
-        {
-            s.writeIndex = s.characteristics.indexOf(characteristic);
 
-            if ((s.characteristics != null) && (s.writeIndex >= 0)) {
-                Log.d(TAG, "writeCharacteristic found characteristic in array:");
-                Log.d(
-                        TAG,
-                        "Service = [instanceID = " + instanceId + " svcid = "
-                                + this.mServiceId.toString() + " serviceType = "
-                                + this.mServiceId.getServiceType());
-                Log.d(TAG, "CharID = [instanceID = " + characteristic.getInstanceID()
-                        + " svcid = " + characteristic.getID().toString());
-                BleGattID svcId = new BleGattID(instanceId, this.mServiceId.getUuid(),
-                        this.mServiceId.getServiceType());
-                BleGattID cID = characteristic.getID();
-                BluetoothGattCharID charID = new BluetoothGattCharID(svcId, cID);
-                try
-                {
-                    if (characteristic.isDirty()) {
-                        if (characteristic.getWriteType() == 0)
-                            characteristic.setWriteType(2);
-                        characteristic.setDirty(false);
-                        this.mProfile.getGattService().writeCharValue(connID, charID,
-                                characteristic.getWriteType(), characteristic.getAuthReq(),
-                                characteristic.getValue());
-                    }
-                    else if (!characteristic.getDirtyDescQueue().isEmpty()) {
-                        ArrayList descList = characteristic.getDirtyDescQueue();
-                        BleDescriptor descObj = (BleDescriptor) descList.get(0);
+        if (s == null) {
+            return ret;
+        }
+        s.writeIndex = s.characteristics.indexOf(characteristic);
 
-                        Log.d(TAG, "writeCharacteristic - descriptor = "
-                                + descObj.getID().toString());
-                        if (descObj.isDirty()) {
-                            BluetoothGattCharDescrID descID = new BluetoothGattCharDescrID(
-                                    svcId, cID, descObj.getID());
-                            descObj.setDirty(false);
-                            this.mProfile.getGattService().writeCharDescrValue(connID,
-                                    descID, descObj.getWriteType(), descObj.getAuthReq(),
-                                    descObj.getValue());
-                        }
-
-                    }
-                    else
-                    {
-                        onWriteCharacteristicComplete(0, remoteDevice, characteristic);
-                    }
-                } catch (RemoteException e) {
-                    ret = 1;
+        if ((s.characteristics != null) && (s.writeIndex >= BleConstants.GATT_SERVICE_PRIMARY)) {
+            Log.d(TAG, "writeCharacteristic found characteristic in array:");
+            Log.d(TAG,
+                    "Service = [instanceID = " + instanceId + " svcid = "
+                            + mServiceId.toString() + " serviceType = "
+                            + mServiceId.getServiceType());
+            Log.d(TAG, "CharID = [instanceID = " + characteristic.getInstanceID()
+                    + " svcid = " + characteristic.getID().toString());
+            BleGattID svcId = new BleGattID(instanceId, mServiceId.getUuid(),
+                    mServiceId.getServiceType());
+            BleGattID cID = characteristic.getID();
+            BluetoothGattCharID charID = new BluetoothGattCharID(svcId, cID);
+            try
+            {
+                if (characteristic.isDirty()) {
+                    if (characteristic.getWriteType() == BleConstants.GATT_SUCCESS)
+                        characteristic.setWriteType(2);
+                    characteristic.setDirty(false);
+                    mProfile.getGattService().writeCharValue(connID, charID,
+                            characteristic.getWriteType(), characteristic.getAuthReq(),
+                            characteristic.getValue());
                 }
-            } else {
-                onWriteCharacteristicComplete(0, remoteDevice, characteristic);
+                else if (!characteristic.getDirtyDescQueue().isEmpty()) {
+                    ArrayList<BleDescriptor> descList =
+                            characteristic.getDirtyDescQueue();
+                    BleDescriptor descObj = descList.get(0);
+
+                    Log.d(TAG, "writeCharacteristic - descriptor = "
+                            + descObj.getID().toString());
+                    if (descObj.isDirty()) {
+                        BluetoothGattCharDescrID descID = new BluetoothGattCharDescrID(
+                                svcId, cID, descObj.getID());
+                        descObj.setDirty(false);
+                        mProfile.getGattService().writeCharDescrValue(connID,
+                                descID, descObj.getWriteType(), descObj.getAuthReq(),
+                                descObj.getValue());
+                    }
+
+                }
+                else
+                {
+                    onWriteCharacteristicComplete(0, remoteDevice, characteristic);
+                }
+            } catch (RemoteException e) {
+                ret = BleConstants.GATT_ERROR;
             }
+        } else {
+            onWriteCharacteristicComplete(0, remoteDevice, characteristic);
         }
         return ret;
     }
 
+    /**
+     * Retrieves an array of all characteristics included in this service. The
+     * characteristics and descriptors are read when this service is refreshed
+     * using the refresh function.
+     */
     public ArrayList<BleCharacteristic> getAllCharacteristics(BluetoothDevice remoteDevice)
     {
         Log.d(TAG, "getAllCharacteristics");
 
-        ServiceData s = getServiceData(remoteDevice, this.mServiceId.getInstanceID());
+        ServiceData s = getServiceData(remoteDevice, mServiceId.getInstanceID());
         if (null != s) {
             return s.characteristics;
         }
         return null;
     }
 
+    /**
+     * Returns a characteristic of this service based on it's ID.
+     */
     public BleCharacteristic getCharacteristic(BluetoothDevice remoteDevice,
             BleGattID characteristicID)
     {
         Log.d(TAG, "getCharacteristic charID = [" + characteristicID.toString()
                 + "] instance ID = [" + characteristicID.getInstanceID() + "]");
-        ServiceData s = getServiceData(remoteDevice, this.mServiceId.getInstanceID());
+        ServiceData s = getServiceData(remoteDevice, mServiceId.getInstanceID());
         if (s == null) {
             Log.d(TAG, "getCharacterisic - Service data not found");
             return null;
         }
         for (int i = 0; i < s.characteristics.size(); i++) {
-            BleCharacteristic c = (BleCharacteristic) s.characteristics.get(i);
+            BleCharacteristic c = s.characteristics.get(i);
             if (c != null) {
                 if (c.getID() != null) {
                     if ((c.getID().toString().equals(characteristicID.toString()))
@@ -145,15 +193,18 @@ public abstract class BleClientService
         return null;
     }
 
+    /**
+     * Returns a list of all instance IDs for this service.
+     */
     public int[] getAllServiceInstanceIds(BluetoothDevice remoteDevice)
     {
         Log.d(TAG, "getAllServiceInstanceIds");
-        ArrayList s = (ArrayList) this.mdeviceToDataMap.get(remoteDevice);
+        ArrayList<ServiceData> s = mdeviceToDataMap.get(remoteDevice);
         if (s != null) {
             int[] instanceIds = new int[s.size()];
 
             for (int i = 0; i < s.size(); i++) {
-                instanceIds[i] = ((ServiceData) s.get(0)).instanceID;
+                instanceIds[i] = s.get(0).instanceID;
             }
 
             return instanceIds;
@@ -162,13 +213,25 @@ public abstract class BleClientService
         return null;
     }
 
+    /**
+     * Refreshes all remote characteristics for all instances of this service. <br>
+     * <br>
+     * This method will determine all characteristics provided by a given
+     * service on the remote device and update all accessible values in the
+     * service. <br>
+     * <br>
+     * The {@link onRefreshComplete(BluetoothDevice)} callback is triggered
+     * after all characteristics have been refreshed.
+     * 
+     * @see {@link onRefreshComplete(BluetoothDevice)}
+     */
     public void refresh(BluetoothDevice remoteDevice)
     {
-        Log.d(TAG, "Refresh (" + this.mServiceId.toString() + ")");
+        Log.d(TAG, "Refresh (" + mServiceId.toString() + ")");
 
-        ArrayList s = (ArrayList) this.mdeviceToDataMap.get(remoteDevice);
+        ArrayList<ServiceData> s = mdeviceToDataMap.get(remoteDevice);
         if (s != null) {
-            ServiceData sd = (ServiceData) s.get(0);
+            ServiceData sd = s.get(0);
             Log.e(TAG,
                     "refresh() - Service data found, reading first characteristic... (serviceType = "
                             + sd.serviceType + ")");
@@ -179,11 +242,18 @@ public abstract class BleClientService
         }
     }
 
+    /**
+     * Refreshes a given characteristic from the remote device. This method
+     * updates the given characteristic value and descriptors from the remote
+     * device.
+     * 
+     * @see {@link #onReadCharacteristicComplete(BluetoothDevice,BleCharacteristic)}
+     */
     public int readCharacteristic(BluetoothDevice remoteDevice,
             BleCharacteristic characteristic)
     {
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
         Log.d(TAG,
                 "readCharacteristic - svc UUID = " + getServiceId().getUuid().toString()
                         + ", characteristic = " + characteristic.getID());
@@ -192,19 +262,23 @@ public abstract class BleClientService
                 characteristic.getInstanceID(), getServiceId().getUuid(), getServiceId()
                         .getServiceType()), characteristic.getID());
 
-        if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
+        if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
             readCharacteristicValue(connID, charID, characteristic.getAuthReq());
         else {
-            ret = 1;
+            ret = BleConstants.GATT_INVALID_CONN_ID;
         }
         return ret;
     }
 
+    /**
+     * Called to indicate a write operation to a characteristic on a remote
+     * device has competed.
+     */
     public void onWriteCharacteristicComplete(int status, BluetoothDevice remoteDevice,
             BleCharacteristic characteristic)
     {
         Log.d(TAG, "onWriteCharacteristicComplete 1 status=" + status);
-        if (status == 5) {
+        if (status == BleConstants.GATT_INSUF_AUTHENTICATION) {
             Log.d(TAG,
                     "onWriteCharacteristicComplete rcv GATT_INSUF_AUTHENTICATION issue createBond");
             if (remoteDevice.createBond())
@@ -213,14 +287,12 @@ public abstract class BleClientService
                 Log.e(TAG, "onWriteCharacteristicComplete createBond request FAILED");
             }
         }
-        else if (status == 15) {
-            Log
-                    .d(TAG,
-                            "onWriteCharacteristicComplete rcv GATT_INSUF_ENCRYPTION check link can be encrypt or not");
-            if (remoteDevice.getBondState() == 12) {
-                Log
-                        .d(TAG,
-                                "device bonded start to encrypt the link.  !!!! This case should not happen !!!!");
+        else if (status == BleConstants.GATT_INSUF_ENCRYPTION) {
+            Log.d(TAG,
+                    "onWriteCharacteristicComplete rcv GATT_INSUF_ENCRYPTION check link can be encrypt or not");
+            if (remoteDevice.getBondState() == BluetoothDevice.BOND_BONDED) {
+                Log.d(TAG,
+                        "device bonded start to encrypt the link.  !!!! This case should not happen !!!!");
             } else {
                 Log.d(TAG, "device is Not bonded start to pair");
                 remoteDevice.createBond();
@@ -228,23 +300,43 @@ public abstract class BleClientService
         }
     }
 
+    /**
+     * Callback indicating a remote characteristic has changed. This callback is
+     * invoked if the local device has registered for notifications from the
+     * remote server.
+     * 
+     * @see {@link #registerForNotification(BluetoothDevice, int, BleGattID)}
+     */
     public void onCharacteristicChanged(BluetoothDevice remoteDevice,
             BleCharacteristic characteristic)
     {
         Log.d(TAG, "onCharacteristicChanged");
     }
 
+    /**
+     * Callback indicating a refresh has been completed for this service.
+     */
     public void onRefreshComplete(BluetoothDevice remoteDevice)
     {
         Log.d(TAG, "onRefreshComplete");
     }
 
+    /**
+     * Callback invoked when a service requires the authorization requirement
+     * for a given characteristic to be set. An application should call
+     * {@link BleCharacteristic#setAuthReq(byte)} for the provided
+     * characteristic to set the required level of authorization.
+     */
     public void onSetCharacteristicAuthRequirement(BluetoothDevice remoteDevice,
             BleCharacteristic characteristic, int instanceID)
     {
         Log.d(TAG, "onSetCharacteristicAuthRequirement");
     }
 
+    /**
+     * Called when a given characteristic has been updated and it's value and
+     * descriptors have been read.
+     */
     public void onReadCharacteristicComplete(BluetoothDevice remoteDevice,
             BleCharacteristic characteristic)
     {
@@ -255,57 +347,66 @@ public abstract class BleClientService
             BleCharacteristic characteristic)
     {
         Log.d(TAG, "onReadCharacteristicComplete status=" + status);
-        if (status == 5) {
+        if (status == BleConstants.GATT_INSUF_AUTHENTICATION) {
             Log.d(TAG,
                     "onReadCharacteristicComplete rcv GATT_INSUF_AUTHENTICATION issue createBond");
             remoteDevice.createBond();
-        } else if (status == 15) {
-            Log
-                    .d(TAG,
-                            "onReadCharacteristicComplete rcv GATT_INSUF_ENCRYPTION check link can be encrypt or not");
-            if (remoteDevice.getBondState() == 12) {
-                Log
-                        .d(TAG,
-                                "device bonded start to encrypt the link.  !!!! This case should not happen !!!!");
-            } else {
-                Log.d(TAG, "device is Not bonded start to pair");
-                remoteDevice.createBond();
-            }
+            return;
         }
+        if (status != BleConstants.GATT_INSUF_ENCRYPTION) {
+            return;
+        }
+
+        Log.d(TAG,
+                "onReadCharacteristicComplete rcv GATT_INSUF_ENCRYPTION check link can be encrypt or not");
+        if (remoteDevice.getBondState() == BluetoothDevice.BOND_BONDED) {
+            Log.d(TAG,
+                    "device bonded start to encrypt the link.  !!!! This case should not happen !!!!");
+        } else {
+            Log.d(TAG, "device is Not bonded start to pair");
+            remoteDevice.createBond();
+        }
+
     }
 
+    /**
+     * Registers for notification from the server for this service.
+     */
     public int registerForNotification(BluetoothDevice remoteDevice, int instanceID,
             BleGattID characteristicID)
     {
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "registerForNotification address: " + remoteDevice.getAddress());
         try {
             BleGattID svcId = new BleGattID(instanceID, getServiceId().getUuid(),
                     getServiceId().getServiceType());
             BluetoothGattCharID charId = new BluetoothGattCharID(svcId, characteristicID);
 
-            this.mProfile.getGattService().registerForNotifications(
-                    this.mProfile.getClientIf(), remoteDevice.getAddress(), charId);
+            mProfile.getGattService().registerForNotifications(
+                    mProfile.getClientIf(), remoteDevice.getAddress(), charId);
         } catch (RemoteException e) {
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
         return ret;
     }
 
+    /**
+     * Unregister for notification from the server for this service.
+     */
     public int unregisterNotification(BluetoothDevice remoteDevice, int instanceID,
             BleGattID characteristicID)
     {
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "unregisterNotification address: " + remoteDevice.getAddress());
         try {
             BleGattID svcId = new BleGattID(instanceID, getServiceId().getUuid(),
                     getServiceId().getServiceType());
             BluetoothGattCharID charId = new BluetoothGattCharID(svcId, characteristicID);
 
-            this.mProfile.getGattService().deregisterForNotifications(
-                    this.mProfile.getClientIf(), remoteDevice.getAddress(), charId);
+            mProfile.getGattService().deregisterForNotifications(
+                    mProfile.getClientIf(), remoteDevice.getAddress(), charId);
         } catch (RemoteException e) {
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
@@ -316,43 +417,45 @@ public abstract class BleClientService
         Log.d(TAG, "setInstanceID address = " + remoteDevice.getAddress());
 
         ServiceData sd = getServiceData(remoteDevice, instanceId);
-        this.mServiceId.setInstanceId(instanceId);
+        mServiceId.setInstanceId(instanceId);
         if (null == sd) {
             Log.d(TAG, "setInstanceID setting instance id (" + instanceId + ")");
 
             sd = new ServiceData();
-            sd.instanceID = this.mServiceId.getInstanceID();
-            sd.serviceType = this.mServiceId.getServiceType();
-            ArrayList s = (ArrayList) this.mdeviceToDataMap.get(remoteDevice);
+            sd.instanceID = mServiceId.getInstanceID();
+            sd.serviceType = mServiceId.getServiceType();
+            ArrayList<ServiceData> s = mdeviceToDataMap.get(remoteDevice);
             if (null == s) {
-                s = new ArrayList();
+                s = new ArrayList<ServiceData>();
             }
             s.add(sd);
-            this.mdeviceToDataMap.put(remoteDevice, s);
+            mdeviceToDataMap.put(remoteDevice, s);
         }
 
-        sd.instanceID = this.mServiceId.getInstanceID();
-        sd.serviceType = this.mServiceId.getServiceType();
+        sd.instanceID = mServiceId.getInstanceID();
+        sd.serviceType = mServiceId.getServiceType();
         try
         {
-            int connID = 65535;
+            int connID = BleConstants.GATT_INVALID_CONN_ID;
 
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
-                this.mProfile.getGattService().registerServiceDataCallback(connID,
-                        this.mServiceId, remoteDevice.getAddress(), this.mCallback);
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
+                mProfile.getGattService().registerServiceDataCallback(connID,
+                        mServiceId, remoteDevice.getAddress(), mCallback);
         } catch (RemoteException e)
         {
             Log.d(TAG, e.toString());
         }
     }
 
+    /** @hide */
     void removeInstanceID(BluetoothDevice remoteDevice, int instanceID)
     {
     }
 
+    /** @hide */
     void setProfile(BleClientProfile profile)
     {
-        this.mProfile = profile;
+        mProfile = profile;
     }
 
     protected ServiceData getServiceData(BluetoothDevice remoteDevice, int instanceID)
@@ -361,11 +464,11 @@ public abstract class BleClientService
                 + " instanceID = " + instanceID);
 
         ServiceData sData = null;
-        ArrayList s = (ArrayList) this.mdeviceToDataMap.get(remoteDevice);
+        ArrayList<ServiceData> s = mdeviceToDataMap.get(remoteDevice);
         if (s != null) {
             for (int i = 0; i < s.size(); i++) {
-                if (((ServiceData) s.get(i)).instanceID == instanceID) {
-                    sData = (ServiceData) s.get(i);
+                if (s.get(i).instanceID == instanceID) {
+                    sData = s.get(i);
                     break;
                 }
             }
@@ -380,13 +483,13 @@ public abstract class BleClientService
                 + " currentinstanceID = " + currentInstanceID);
 
         ServiceData sData = null;
-        ArrayList s = (ArrayList) this.mdeviceToDataMap.get(remoteDevice);
+        ArrayList<ServiceData> s = mdeviceToDataMap.get(remoteDevice);
         if (s != null) {
             for (int i = 0; i < s.size(); i++) {
-                if (((ServiceData) s.get(i)).instanceID != currentInstanceID)
+                if (s.get(i).instanceID != currentInstanceID)
                     continue;
                 if (s.size() > i + 1) {
-                    sData = (ServiceData) s.get(i + 1);
+                    sData = s.get(i + 1);
                     break;
                 }
             }
@@ -396,26 +499,27 @@ public abstract class BleClientService
         return sData;
     }
 
+    /** @hide */
     protected int getFirstIncludedService(BluetoothDevice remoteDevice, int instanceID)
     {
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
 
         Log.d(TAG, "getFirstIncludedService address = " + remoteDevice.getAddress());
         ServiceData sd = getServiceData(remoteDevice, instanceID);
         try {
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535) {
-                BleGattID svcId = new BleGattID(sd.instanceID, this.mServiceId.getUuid(),
-                        this.mServiceId.getServiceType());
-                this.mProfile.getGattService().getFirstIncludedService(connID, svcId,
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID) {
+                BleGattID svcId = new BleGattID(sd.instanceID, mServiceId.getUuid(),
+                        mServiceId.getServiceType());
+                mProfile.getGattService().getFirstIncludedService(connID, svcId,
                         null);
             }
             else {
-                ret = 1;
+                ret = BleConstants.GATT_INVALID_CONN_ID;
             }
         } catch (RemoteException e) {
             Log.d(TAG, "getFirstIncludedService " + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
@@ -424,45 +528,47 @@ public abstract class BleClientService
     protected int getNextIncludedService(BluetoothDevice remoteDevice,
             BluetoothGattInclSrvcID inclsvcId)
     {
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
 
         Log.d(TAG, "getNextIncludedService address = " + remoteDevice.getAddress());
         try
         {
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
-                this.mProfile.getGattService().getNextIncludedService(connID, inclsvcId,
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
+                mProfile.getGattService().getNextIncludedService(connID, inclsvcId,
                         null);
             else
-                ret = 1;
+                ret = BleConstants.GATT_INVALID_CONN_ID;
         } catch (RemoteException e) {
             Log.d(TAG, "getNextIncludedService " + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /** @hide */
     protected int readFirstCharacteristic(BluetoothDevice remoteDevice, BleGattID svcId)
     {
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
 
         Log.d(TAG, "readFirstCharacteristic address = " + remoteDevice.getAddress());
         try
         {
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
-                this.mProfile.getGattService().getFirstChar(connID, svcId, null);
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
+                mProfile.getGattService().getFirstChar(connID, svcId, null);
             else
-                ret = 1;
+                ret = BleConstants.GATT_INVALID_CONN_ID;
         } catch (RemoteException e) {
             Log.d(TAG, "getFirstCharacteristic " + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /** @hide */
     protected int readNextCharacteristic(BluetoothDevice remoteDevice, BleGattID svcId,
             BleGattID characteristicID)
     {
@@ -470,92 +576,96 @@ public abstract class BleClientService
                 "readNextCharacteristic characteristicID = " + characteristicID.toString()
                         + " char inst id = " + characteristicID.getInstanceID());
 
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
         ServiceData sd = getServiceData(remoteDevice, svcId.getInstanceID());
         BluetoothGattCharID charId = new BluetoothGattCharID(svcId, characteristicID);
         try
         {
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
-                this.mProfile.getGattService().getNextChar(connID, charId, null);
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
+                mProfile.getGattService().getNextChar(connID, charId, null);
             else
-                ret = 1;
+                ret = BleConstants.GATT_INVALID_CONN_ID;
         } catch (RemoteException e) {
             Log.d(TAG, "getFirstCharacteristic " + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /** @hide */
     protected int readFirstCharDescriptor(BluetoothDevice remoteDevice, BleGattID svcId,
             BleGattID characteristicId)
     {
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
 
         Log.d(TAG, "readFirstCharDescriptor address = " + remoteDevice.getAddress());
         BluetoothGattCharID charId = new BluetoothGattCharID(svcId, characteristicId);
         try
         {
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
-                this.mProfile.getGattService().getFirstCharDescr(connID, charId, null);
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
+                mProfile.getGattService().getFirstCharDescr(connID, charId, null);
             else
-                ret = 1;
+                ret = BleConstants.GATT_INVALID_CONN_ID;
         } catch (RemoteException e) {
             Log.d(TAG, "getFirstCharDescriptor " + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /** @hide */
     protected int readNextCharDescriptor(BluetoothDevice remoteDevice, BleGattID svcId,
             BleGattID charId, BleGattID descriptorId)
     {
-        int ret = 0;
-        int connID = 65535;
+        int ret = BleConstants.GATT_SUCCESS;
+        int connID = BleConstants.GATT_INVALID_CONN_ID;
         Log.d(TAG, "readNextCharDescriptor address = " + remoteDevice.getAddress());
         BluetoothGattCharDescrID descId = new BluetoothGattCharDescrID(svcId, charId,
                 descriptorId);
         try
         {
-            if ((connID = this.mProfile.getConnIdForDevice(remoteDevice)) != 65535)
-                this.mProfile.getGattService().getNextCharDescr(connID, descId, null);
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
+                mProfile.getGattService().getNextCharDescr(connID, descId, null);
             else
-                ret = 1;
+                ret = BleConstants.GATT_INVALID_CONN_ID;
         } catch (RemoteException e) {
             Log.d(TAG, "getNextCharDescriptor " + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
     }
 
+    /** @hide */
     protected int readCharacteristicValue(int connID, BluetoothGattCharID charID, byte authReq)
     {
         Log.d(TAG, "readCharacteristicValue ");
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         try {
-            this.mProfile.getGattService().readChar(connID, charID, authReq);
+            mProfile.getGattService().readChar(connID, charID, authReq);
         } catch (RemoteException e) {
             Log.d(TAG, "readCharacteristicValue" + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
         return ret;
     }
 
+    /** @hide */
     protected int readCharDescriptorValue(int connID, BluetoothGattCharDescrID charDescrID,
             byte authReq)
     {
         Log.d(TAG, "readCharDescriptor");
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         try
         {
-            this.mProfile.getGattService().readCharDescr(connID, charDescrID, authReq);
+            mProfile.getGattService().readCharDescr(connID, charDescrID, authReq);
         } catch (RemoteException e) {
             Log.d(TAG, "readCharacteristicExtProp" + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
 
         return ret;
@@ -563,23 +673,24 @@ public abstract class BleClientService
 
     protected int sendIndicationConfirmation(int connId, BluetoothGattCharID charId)
     {
-        int ret = 0;
+        int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "sendIndicationConfirmation");
         try
         {
-            this.mProfile.getGattService().sendIndConfirm(connId, charId);
+            mProfile.getGattService().sendIndConfirm(connId, charId);
         } catch (RemoteException e) {
             Log.d(TAG, "sendIndicationConfirmation" + e.toString());
-            ret = 1;
+            ret = BleConstants.GATT_ERROR;
         }
         return ret;
     }
 
+    /** @hide */
     protected void onServiceRefreshed(int connID)
     {
         Log.d(TAG, "onServiceRefreshed");
-        onRefreshComplete(this.mProfile.getDeviceforConnId(connID));
-        this.mProfile.onServiceRefreshed(this, this.mProfile.getDeviceforConnId(connID));
+        onRefreshComplete(mProfile.getDeviceforConnId(connID));
+        mProfile.onServiceRefreshed(this, mProfile.getDeviceforConnId(connID));
     }
 
     class BleCharacteristicDataCallback extends IBleCharacteristicDataCallback.Stub
@@ -588,6 +699,7 @@ public abstract class BleClientService
         {
         }
 
+        @Override
         public void onGetFirstCharacteristic(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID)
         {
@@ -605,7 +717,7 @@ public abstract class BleClientService
             }
 
             if (status == 0) {
-                BleClientService.ServiceData s = BleClientService.this.getServiceData(
+                ServiceData s = BleClientService.this.getServiceData(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         svcId.getInstanceID());
                 s.characteristics.clear();
@@ -634,7 +746,7 @@ public abstract class BleClientService
             }
             else
             {
-                BleClientService.ServiceData s = BleClientService.this.getNextServiceData(
+                ServiceData s = BleClientService.this.getNextServiceData(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         svcId.getInstanceID());
                 if (null != s)
@@ -650,6 +762,7 @@ public abstract class BleClientService
             }
         }
 
+        @Override
         public void onGetFirstCharacteristicDescriptor(int connID, int status,
                 BluetoothGattID svcId, BluetoothGattID characteristicID,
                 BluetoothGattID descriptorID)
@@ -666,68 +779,68 @@ public abstract class BleClientService
                 return;
             }
 
-            if (status == 0)
-            {
-                Log.d(BleClientService.TAG,
-                        "characteristic ID = " + characteristicID.toString() + "instance ID = "
-                                + characteristicID.getInstanceID());
-
-                BleCharacteristic characteristic = findCharacteristic(connID,
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
-
-                if (descriptorID.getUuidType() == 16) {
-                    String uuid128 = descriptorID.getUuid().toString();
-                    if (uuid128.equals("00002900-0000-1000-8000-00805f9b34fb"))
-                        characteristic.addDescriptor(new BleExtProperty());
-                    else if (uuid128.equals("00002902-0000-1000-8000-00805f9b34fb"))
-                        characteristic.addDescriptor(new BleClientConfig());
-                    else if (uuid128.equals("00002903-0000-1000-8000-00805f9b34fb"))
-                        characteristic.addDescriptor(new BleServerConfig());
-                    else if (uuid128.equals("00002904-0000-1000-8000-00805f9b34fb"))
-                        characteristic.addDescriptor(new BlePresentationFormat());
-                    else if (uuid128.equals("00002901-0000-1000-8000-00805f9b34fb"))
-                        characteristic.addDescriptor(new BleUserDescription());
-                    else
-                        characteristic.addDescriptor(new BleDescriptor(new BleGattID(
-                                descriptorID.getUuid())));
-                }
-                else {
-                    switch (descriptorID.getUuid16()) {
-                        case 10496:
-                            characteristic.addDescriptor(new BleExtProperty());
-                            break;
-                        case 10498:
-                            characteristic.addDescriptor(new BleClientConfig());
-                            break;
-                        case 10499:
-                            characteristic.addDescriptor(new BleServerConfig());
-                            break;
-                        case 10500:
-                            characteristic.addDescriptor(new BlePresentationFormat());
-                            break;
-                        case 10497:
-                            characteristic.addDescriptor(new BleUserDescription());
-                            break;
-                        default:
-                            characteristic.addDescriptor(new BleDescriptor(new BleGattID(
-                                    descriptorID.getUuid16())));
-                    }
-
-                }
-
-                BleClientService.this.readNextCharDescriptor(
-                        BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID),
-                        BleApiHelper.gatt2BleID(descriptorID));
-            }
-            else
-            {
+            if (status != BleConstants.GATT_SUCCESS) {
                 BleClientService.this.readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+                return;
             }
+
+            Log.d(BleClientService.TAG,
+                    "characteristic ID = " + characteristicID.toString() + "instance ID = "
+                            + characteristicID.getInstanceID());
+
+            BleCharacteristic characteristic = findCharacteristic(connID,
+                    BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+
+            if (descriptorID.getUuidType() == BleConstants.GATT_UUID_TYPE_128) {
+                String uuid128 = descriptorID.getUuid().toString();
+                if (uuid128.equals("00002900-0000-1000-8000-00805f9b34fb"))
+                    characteristic.addDescriptor(new BleExtProperty());
+                else if (uuid128.equals("00002902-0000-1000-8000-00805f9b34fb"))
+                    characteristic.addDescriptor(new BleClientConfig());
+                else if (uuid128.equals("00002903-0000-1000-8000-00805f9b34fb"))
+                    characteristic.addDescriptor(new BleServerConfig());
+                else if (uuid128.equals("00002904-0000-1000-8000-00805f9b34fb"))
+                    characteristic.addDescriptor(new BlePresentationFormat());
+                else if (uuid128.equals("00002901-0000-1000-8000-00805f9b34fb"))
+                    characteristic.addDescriptor(new BleUserDescription());
+                else
+                    characteristic.addDescriptor(new BleDescriptor(new BleGattID(
+                            descriptorID.getUuid())));
+            }
+            else {
+                switch (descriptorID.getUuid16()) {
+                    case BleConstants.GATT_UUID_CHAR_EXT_PROP16:
+                        characteristic.addDescriptor(new BleExtProperty());
+                        break;
+                    case BleConstants.GATT_UUID_CHAR_CLIENT_CONFIG16:
+                        characteristic.addDescriptor(new BleClientConfig());
+                        break;
+                    case BleConstants.GATT_UUID_CHAR_SRVR_CONFIG16:
+                        characteristic.addDescriptor(new BleServerConfig());
+                        break;
+                    case BleConstants.GATT_UUID_CHAR_PRESENT_FORMAT16:
+                        characteristic.addDescriptor(new BlePresentationFormat());
+                        break;
+                    case BleConstants.GATT_UUID_CHAR_DESCRIPTION16:
+                        characteristic.addDescriptor(new BleUserDescription());
+                        break;
+                    default:
+                        characteristic.addDescriptor(new BleDescriptor(new BleGattID(
+                                descriptorID.getUuid16())));
+                }
+
+            }
+
+            BleClientService.this.readNextCharDescriptor(
+                    BleClientService.this.mProfile.getDeviceforConnId(connID),
+                    BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID),
+                    BleApiHelper.gatt2BleID(descriptorID));
+
         }
 
+        @Override
         public void onGetNextCharacteristicDescriptor(int connID, int status,
                 BluetoothGattID svcId, BluetoothGattID characteristicID,
                 BluetoothGattID descriptorID)
@@ -744,37 +857,37 @@ public abstract class BleClientService
                 return;
             }
 
-            if (status == 0)
-            {
-                Log.d(BleClientService.TAG,
-                        "characteristic ID = " + characteristicID.toString() + "instance ID = "
-                                + characteristicID.getInstanceID());
-
-                BleCharacteristic characteristic = findCharacteristic(connID,
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
-
-                if (descriptorID.getUuidType() == 16) {
-                    characteristic.addDescriptor(new BleDescriptor(new BleGattID(
-                            descriptorID.getUuid())));
-                }
-                else {
-                    characteristic.addDescriptor(new BleDescriptor(new BleGattID(
-                            descriptorID.getUuid16())));
-                }
-
-                BleClientService.this.readNextCharDescriptor(
-                        BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID),
-                        BleApiHelper.gatt2BleID(descriptorID));
-            }
-            else
-            {
+            if (status != BleConstants.GATT_SUCCESS) {
                 BleClientService.this.readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+                return;
             }
+
+            Log.d(BleClientService.TAG,
+                    "characteristic ID = " + characteristicID.toString() + "instance ID = "
+                            + characteristicID.getInstanceID());
+
+            BleCharacteristic characteristic = findCharacteristic(connID,
+                    BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+
+            if (descriptorID.getUuidType() == BleConstants.GATT_UUID_TYPE_128) {
+                characteristic.addDescriptor(new BleDescriptor(new BleGattID(
+                        descriptorID.getUuid())));
+            }
+            else {
+                characteristic.addDescriptor(new BleDescriptor(new BleGattID(
+                        descriptorID.getUuid16())));
+            }
+
+            BleClientService.this.readNextCharDescriptor(
+                    BleClientService.this.mProfile.getDeviceforConnId(connID),
+                    BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID),
+                    BleApiHelper.gatt2BleID(descriptorID));
+
         }
 
+        @Override
         public void onGetNextCharacteristic(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID)
         {
@@ -791,8 +904,8 @@ public abstract class BleClientService
                 return;
             }
 
-            if (status == 0) {
-                BleClientService.ServiceData s = BleClientService.this.getServiceData(
+            if (status == BleConstants.GATT_SUCCESS) {
+                ServiceData s = BleClientService.this.getServiceData(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         svcId.getInstanceID());
 
@@ -801,7 +914,7 @@ public abstract class BleClientService
                                 + characteristicID.getInstanceID());
 
                 BleCharacteristic characteristic = null;
-                if (characteristicID.getUuidType() == 16)
+                if (characteristicID.getUuidType() == BleConstants.GATT_UUID_TYPE_128)
                     characteristic = new BleCharacteristic(new BleGattID(
                             characteristicID.getUuid()));
                 else
@@ -821,7 +934,7 @@ public abstract class BleClientService
             }
             else
             {
-                BleClientService.ServiceData s = BleClientService.this.getNextServiceData(
+                ServiceData s = BleClientService.this.getNextServiceData(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         svcId.getInstanceID());
 
@@ -840,6 +953,7 @@ public abstract class BleClientService
             }
         }
 
+        @Override
         public void onReadCharacteristicValue(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID, byte[] data)
         {
@@ -849,38 +963,39 @@ public abstract class BleClientService
             BleCharacteristic c = findCharacteristic(connID,
                     BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
 
-            if (c != null) {
-                if (status == 0) {
-                    c.setValue(data);
-                    if (BleClientService.this.mReadDescriptors)
-                    {
-                        ArrayList descList = c.getDirtyDescQueue();
-                        if (!descList.isEmpty()) {
-                            BleDescriptor descObj = (BleDescriptor) descList.get(0);
-                            BleClientService.this.readCharDescriptorValue(
-                                    connID,
-                                    new BluetoothGattCharDescrID(svcId, characteristicID, descObj
-                                            .getID()), descObj.getAuthReq());
-                        }
-                        else {
-                            BleClientService.this.onReadCharacteristicComplete(
-                                    BleClientService.this.mProfile.getDeviceforConnId(connID), c);
-                        }
-                    } else {
-                        BleClientService.this.onReadCharacteristicComplete(
-                                BleClientService.this.mProfile.getDeviceforConnId(connID), c);
-                    }
-                }
-                else {
-                    BleClientService.this.onReadCharacteristicComplete(status,
-                            BleClientService.this.mProfile.getDeviceforConnId(connID), c);
-                }
-            }
-            else
+            if (c == null) {
                 Log.e(BleClientService.TAG,
                         "onReadCharacteristicValue() - Characteristic not found");
+            }
+
+            if (status != BleConstants.GATT_SUCCESS) {
+                BleClientService.this.onReadCharacteristicComplete(status,
+                        BleClientService.this.mProfile.getDeviceforConnId(connID), c);
+                return;
+            }
+
+            c.setValue(data);
+            if (BleClientService.this.mReadDescriptors)
+            {
+                ArrayList<BleDescriptor> descList = c.getDirtyDescQueue();
+                if (!descList.isEmpty()) {
+                    BleDescriptor descObj = descList.get(0);
+                    BleClientService.this.readCharDescriptorValue(
+                            connID,
+                            new BluetoothGattCharDescrID(svcId, characteristicID, descObj
+                                    .getID()), descObj.getAuthReq());
+                }
+                else {
+                    BleClientService.this.onReadCharacteristicComplete(
+                            BleClientService.this.mProfile.getDeviceforConnId(connID), c);
+                }
+            } else {
+                BleClientService.this.onReadCharacteristicComplete(
+                        BleClientService.this.mProfile.getDeviceforConnId(connID), c);
+            }
         }
 
+        @Override
         public void onReadCharDescriptorValue(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID, BluetoothGattID descr, byte[] data)
         {
@@ -902,9 +1017,9 @@ public abstract class BleClientService
                         if (c != null)
                         {
                             c.updateDirtyDescQueue();
-                            ArrayList descList = c.getDirtyDescQueue();
+                            ArrayList<BleDescriptor> descList = c.getDirtyDescQueue();
                             if (!descList.isEmpty()) {
-                                BleDescriptor descObj = (BleDescriptor) descList.get(0);
+                                BleDescriptor descObj = descList.get(0);
                                 BleClientService.this.readCharDescriptorValue(connID,
                                         new BluetoothGattCharDescrID(svcId, characteristicID,
                                                 descObj.getID()), descObj.getAuthReq());
@@ -925,6 +1040,7 @@ public abstract class BleClientService
                 }
         }
 
+        @Override
         public void onWriteCharValue(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID)
         {
@@ -943,6 +1059,7 @@ public abstract class BleClientService
                         BleClientService.this.mProfile.getDeviceforConnId(connID), c);
         }
 
+        @Override
         public void onWriteCharDescrValue(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID, BluetoothGattID descr)
         {
@@ -968,12 +1085,12 @@ public abstract class BleClientService
                     "findNextCharacteristic " + connID + " current characteristic :"
                             + c.getID().toString() + " instance id = " + c.getInstanceID());
 
-            BleClientService.ServiceData s = BleClientService.this.getServiceData(
+            ServiceData s = BleClientService.this.getServiceData(
                     BleClientService.this.mProfile.getDeviceforConnId(connID), instanceID);
 
             int i;
             for (i = 0; i < s.characteristics.size(); i++) {
-                BleCharacteristic cTemp = (BleCharacteristic) s.characteristics.get(i);
+                BleCharacteristic cTemp = s.characteristics.get(i);
                 if (c.getID().equals(cTemp.getID()))
                 {
                     break;
@@ -982,9 +1099,9 @@ public abstract class BleClientService
             if (i + 1 < s.characteristics.size()) {
                 Log.d(BleClientService.TAG, "findNextCharacteristic position =  " + i
                         + "connID = " + connID + " next characteristic :"
-                        + ((BleCharacteristic) s.characteristics.get(i + 1)).getID().toString());
+                        + s.characteristics.get(i + 1).getID().toString());
 
-                return (BleCharacteristic) s.characteristics.get(i + 1);
+                return s.characteristics.get(i + 1);
             }
             return null;
         }
@@ -996,12 +1113,12 @@ public abstract class BleClientService
                     "findCharacteristic charID = [" + characteristicID.toString()
                             + "] instance ID = [" + characteristicID.getInstanceID() + "]");
 
-            BleClientService.ServiceData s = BleClientService.this.getServiceData(
+            ServiceData s = BleClientService.this.getServiceData(
                     BleClientService.this.mProfile.getDeviceforConnId(connID),
                     svcId.getInstanceID());
 
             for (int i = 0; i < s.characteristics.size(); i++) {
-                BleCharacteristic c = (BleCharacteristic) s.characteristics.get(i);
+                BleCharacteristic c = s.characteristics.get(i);
                 if ((!c.getID().toString().equals(characteristicID.toString()))
                         || (c.getInstanceID() != characteristicID.getInstanceID()))
                     continue;
@@ -1019,13 +1136,13 @@ public abstract class BleClientService
                     "findCharacteristic charID = [" + characteristicID.toString()
                             + "] instance ID = [" + characteristicID.getInstanceID() + "]");
 
-            BleClientService.ServiceData s = BleClientService.this.getServiceData(
+            ServiceData s = BleClientService.this.getServiceData(
                     BleClientService.this.mProfile.getDeviceforConnId(connID),
                     svcId.getInstanceID());
 
             BleCharacteristic charObj = null;
             for (int i = 0; i < s.characteristics.size(); i++) {
-                BleCharacteristic c = (BleCharacteristic) s.characteristics.get(i);
+                BleCharacteristic c = s.characteristics.get(i);
 
                 if (c.getID().equals(characteristicID.getUuid())) {
                     Log.d(BleClientService.TAG, "findCharacteristic - found");
@@ -1034,7 +1151,7 @@ public abstract class BleClientService
             }
             if (charObj != null) {
                 for (int i = 0; i < charObj.getAllDescriptors().size(); i++) {
-                    BleDescriptor d = (BleDescriptor) charObj.getAllDescriptors().get(i);
+                    BleDescriptor d = charObj.getAllDescriptors().get(i);
                     if (d.getID().equals(descriptorID)) {
                         Log.d(BleClientService.TAG, "findDescriptor - found");
                         return d;
@@ -1045,18 +1162,21 @@ public abstract class BleClientService
             return null;
         }
 
+        @Override
         public void onRegForNotifications(int connId, int status, BluetoothGattID svcId,
                 BluetoothGattID charId)
         {
             Log.d(BleClientService.TAG, "onRegForNotifications " + status);
         }
 
+        @Override
         public void onUnregisterNotifications(int connId, int status, BluetoothGattID svcId,
                 BluetoothGattID charId)
         {
             Log.d(BleClientService.TAG, "onUnregisterNotifications" + status);
         }
 
+        @Override
         public void onNotify(int connId, String address, BluetoothGattID svcId,
                 BluetoothGattID characteristicID, boolean isNotify, byte[] data)
         {
@@ -1084,6 +1204,7 @@ public abstract class BleClientService
             }
         }
 
+        @Override
         public void onGetFirstIncludedService(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID inclsvcId)
         {
@@ -1101,6 +1222,7 @@ public abstract class BleClientService
             }
         }
 
+        @Override
         public void onGetNextIncludedService(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID inclsvcId)
         {
@@ -1125,7 +1247,7 @@ public abstract class BleClientService
         public int writeIndex = -1;
         public int serviceType = -1;
 
-        public ArrayList<BleCharacteristic> characteristics = new ArrayList();
+        public ArrayList<BleCharacteristic> characteristics = new ArrayList<BleCharacteristic>();
 
         ServiceData()
         {

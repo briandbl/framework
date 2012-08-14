@@ -4,57 +4,57 @@ import com.broadcom.bt.service.gatt.BluetoothGattID;
 
 interface IBleServiceCallback {
     
-    void onServiceCreated(byte paramByte, int paramInt);
+    void onServiceCreated(byte status, int svcHandle);
  
-    void onServiceRegistered(byte paramByte,
-                             in BluetoothGattID id);
+    void onServiceRegistered(byte status,
+                             in BluetoothGattID svcId);
 
-    void onIncludedServiceAdded(byte paramByte, int paramInt);
+    void onIncludedServiceAdded(byte status, int incSvc);
 
     
-    void onCharacteristicAdded(byte paramByte,
-                               in BluetoothGattID id, 
-                               int paramInt);
+    void onCharacteristicAdded(byte status,
+                               in BluetoothGattID charDescId, 
+                               int charHandle);
 
-    void onCharacteristicDescrAdded(byte paramByte,
-                                    in BluetoothGattID id, 
-                                    int paramInt);
+    void onCharacteristicDescrAdded(byte status,
+                                    in BluetoothGattID charDescId, 
+                                    int charDescHandle);
 
-    void onServiceDeleted(byte paramByte);
+    void onServiceDeleted(byte status);
 
-    void onServiceStarted(byte paramByte);
+    void onServiceStarted(byte status);
     
-    void onServiceStopped(byte paramByte);
+    void onServiceStopped(byte status);
     
-    void onHandleValueIndicationCompleted(byte paramByte, 
-                                          int paramInt);
+    void onHandleValueIndicationCompleted(byte status, 
+                                          int attrHandle);
 
-    void onHandleValueNotificationCompleted(byte paramByte, 
-                                            int paramInt);
+    void onHandleValueNotificationCompleted(byte status, 
+                                            int attrHandle);
 
-    void onResponseSendCompleted(byte paramByte, 
-                                 int paramInt);
+    void onResponseSendCompleted(byte status, 
+                                 int attrHandle);
 
-    void onAttributeRequestRead(in String paramString, 
-                                int paramInt1,
-                                int paramInt2, 
-                                int paramInt3, 
-                                int paramInt4, 
-                                boolean paramBoolean);
+    void onAttributeRequestRead(in String address, 
+                                int connId,
+                                int transId, 
+                                int attrHandle, 
+                                int offset, 
+                                boolean isLong);
     
-    void onAttributeRequestWrite(in String paramString, 
-                                 int paramInt1,
-                                 int paramInt2, 
-                                 int paramInt3, 
-                                 boolean paramBoolean1, 
-                                 int paramInt4,
-                                 boolean paramBoolean2, 
-                                 int paramInt5, 
-                                 in byte[] paramArrayOfByte);
+    void onAttributeRequestWrite(in String address, 
+                                 int connId,
+                                 int transId, 
+                                 int attrHandle, 
+                                 boolean isPrep, 
+                                 int len,
+                                 boolean needRsp, 
+                                 int offset, 
+                                 in byte[] data);
     
-    void onAttributeExecWrite(in String paramString, 
-                              int paramInt1,
-                              int paramInt2, 
-                              int paramInt3);
+    void onAttributeExecWrite(in String address, 
+                              int connId,
+                              int transId, 
+                              int execWrite);
 
 }

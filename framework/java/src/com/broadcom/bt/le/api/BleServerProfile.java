@@ -32,23 +32,25 @@ public abstract class BleServerProfile
     public BleServerProfile(Context ctxt, BleGattID appId,
             ArrayList<BleServerService> serviceArr)
     {
-        this.mAppid = appId;
-        this.mCtxt = ctxt;
-        this.mServiceArr = serviceArr;
-        this.mConnMap = new HashMap();
-        this.mMtuMap = new HashMap();
-        this.mSvcConn = new GattServiceConnection(null);
+        mAppid = appId;
+        mCtxt = ctxt;
+        mServiceArr = serviceArr;
+        mConnMap = new HashMap<String, Integer>();
+        mMtuMap = new HashMap<Integer, Integer>();
+        mSvcConn = new GattServiceConnection(null);
         Intent i = new Intent();
         i.setClassName("com.broadcom.bt.app.system",
                 "com.broadcom.bt.app.system.GattService");
-        this.mCtxt.bindService(i, this.mSvcConn, 1);
+        mCtxt.bindService(i, mSvcConn, 1);
+        
+        throw new RuntimeException("Not implemented");
     }
 
     public synchronized void finish()
     {
-        if (this.mSvcConn != null) {
-            this.mCtxt.unbindService(this.mSvcConn);
-            this.mSvcConn = null;
+        if (mSvcConn != null) {
+            mCtxt.unbindService(mSvcConn);
+            mSvcConn = null;
         }
     }
 
@@ -59,18 +61,18 @@ public abstract class BleServerProfile
 
     byte getAppHandle()
     {
-        return this.mAppHandle;
+        return mAppHandle;
     }
 
     HashMap<String, Integer> getConnMap() {
-        return this.mConnMap;
+        return mConnMap;
     }
 
     void initProfile()
     {
         Log.i("BleServerProfile", "initProfile()");
         try {
-            this.mService.registerServerProfileCallback(this.mAppid,
+            mService.registerServerProfileCallback(mAppid,
                     new BleServerProfileCallback(this));
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to start profile", t);
@@ -79,17 +81,17 @@ public abstract class BleServerProfile
 
     void notifyAction(int event)
     {
-        if ((event == 0) && (++this.mSvcCreated == this.mServiceArr.size()))
+        if ((event == 0) && (++mSvcCreated == mServiceArr.size()))
         {
             Log.i("BleServerProfile",
                     "All services created successfully. Calling onInitialized");
             onInitialized(true);
-        } else if ((event == 4) && (--this.mSvcCreated == 0))
+        } else if ((event == 4) && (--mSvcCreated == 0))
         {
             Log.i("BleServerProfile",
                     "All services stopped successfully. Calling onStopped");
             onStopped();
-        } else if ((event == 2) && (++this.mSvcStarted == this.mServiceArr.size()))
+        } else if ((event == 2) && (++mSvcStarted == mServiceArr.size()))
         {
             Log.i("BleServerProfile",
                     "All services started successfully. Calling onStarted");
@@ -97,12 +99,12 @@ public abstract class BleServerProfile
         } else if (event == 1) {
             Log.i("BleServerProfile",
                     "One of the services creation failed. Calling onInitialized");
-            this.mProfileStatus = 2;
+            mProfileStatus = 2;
             onInitialized(false);
         } else if (event == 3) {
             Log.i("BleServerProfile",
                     "One of the services start failed. Calling onStarted");
-            this.mProfileStatus = 2;
+            mProfileStatus = 2;
             onStarted(false);
         } else {
             Log.e("BleServerProfile", "Unknown action from a service");
@@ -112,39 +114,39 @@ public abstract class BleServerProfile
     public void startProfile()
     {
         Log.i("BleServerProfile", "startProfile()");
-        if (this.mService == null) {
+        if (mService == null) {
             Log.i("BleServerProfile", "Remote service object is null.. Returning..");
             return;
         }
 
-        for (int i = 0; i < this.mServiceArr.size(); i++) {
-            if (!((BleServerService) this.mServiceArr.get(i)).isRegistered()) {
+        for (int i = 0; i < mServiceArr.size(); i++) {
+            if (!((BleServerService) mServiceArr.get(i)).isRegistered()) {
                 Log.i("BleServerProfile",
                         "One of the services is not registered. Stopping all the services");
                 stopProfile();
                 return;
             }
 
-            ((BleServerService) this.mServiceArr.get(i)).startService();
+            ((BleServerService) mServiceArr.get(i)).startService();
         }
     }
 
     public void stopProfile()
     {
         Log.i("BleServerProfile", "stopProfile()");
-        for (int i = 0; i < this.mServiceArr.size(); i++)
-            ((BleServerService) this.mServiceArr.get(i)).stopService();
+        for (int i = 0; i < mServiceArr.size(); i++)
+            ((BleServerService) mServiceArr.get(i)).stopService();
     }
 
     public void finishProfile()
     {
         Log.i("BleServerProfile", "finishProfile()");
-        for (int i = 0; i < this.mServiceArr.size(); i++) {
-            ((BleServerService) this.mServiceArr.get(i)).deleteService();
+        for (int i = 0; i < mServiceArr.size(); i++) {
+            ((BleServerService) mServiceArr.get(i)).deleteService();
         }
         try
         {
-            this.mService.unregisterServerProfileCallback(this.mAppHandle);
+            mService.unregisterServerProfileCallback(mAppHandle);
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to stop profile", t);
             return;
@@ -154,14 +156,14 @@ public abstract class BleServerProfile
     public void setMtuSize(int connId, int mtuSize)
     {
         Log.i("BleServerProfile", "setMtuSize");
-        this.mMtuMap.put(Integer.valueOf(connId), Integer.valueOf(mtuSize));
+        mMtuMap.put(Integer.valueOf(connId), Integer.valueOf(mtuSize));
     }
 
     public void setEncryption(String bdaddr, byte action)
     {
         try
         {
-            this.mService.setEncryption(bdaddr, action);
+            mService.setEncryption(bdaddr, action);
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to set encryption for connection", t);
         }
@@ -171,7 +173,7 @@ public abstract class BleServerProfile
     {
         try
         {
-            this.mService.setScanParameters(scanInterval, scanWindow);
+            mService.setScanParameters(scanInterval, scanWindow);
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to set scan parameters", t);
         }
@@ -181,7 +183,7 @@ public abstract class BleServerProfile
     {
         try
         {
-            this.mService.GATTServer_Open(this.mAppHandle, bdaddr, isDirect);
+            mService.GATTServer_Open(mAppHandle, bdaddr, isDirect);
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to open Gatt connection", t);
         }
@@ -191,7 +193,7 @@ public abstract class BleServerProfile
     {
         try
         {
-            this.mService.GATTServer_CancelOpen(this.mAppHandle, bdaddr, isDirect);
+            mService.GATTServer_CancelOpen(mAppHandle, bdaddr, isDirect);
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to open Gatt connection", t);
             return;
@@ -202,7 +204,7 @@ public abstract class BleServerProfile
     {
         try
         {
-            this.mService.GATTServer_Close(((Integer) this.mConnMap.get(bdaddr))
+            mService.GATTServer_Close(((Integer) mConnMap.get(bdaddr))
                     .intValue());
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to open Gatt connection", t);
@@ -213,10 +215,10 @@ public abstract class BleServerProfile
     protected void onAppRegisterCompleted(int status, int serIf)
     {
         if (status == 0) {
-            this.mAppHandle = (byte) serIf;
-            for (int i = 0; i < this.mServiceArr.size(); i++)
-                ((BleServerService) this.mServiceArr.get(i)).onServiceAvailable(this,
-                        this.mService, this.mAppid);
+            mAppHandle = (byte) serIf;
+            for (int i = 0; i < mServiceArr.size(); i++)
+                ((BleServerService) mServiceArr.get(i)).onServiceAvailable(this,
+                        mService, mAppid);
         } else {
             Log.e("BleServerProfile", "Application registration failed.. Aborting");
         }
@@ -242,7 +244,7 @@ public abstract class BleServerProfile
 
         public BleServerProfileCallback(BleServerProfile profile)
         {
-            this.mProfile = profile;
+            mProfile = profile;
         }
 
         public void onClientConnected(int connId, String bdaddr, boolean isConnected)
@@ -250,11 +252,11 @@ public abstract class BleServerProfile
             Log.i("BleServerProfile", "onClientConncted addr is " + bdaddr + " connId is "
                     + connId);
 
-            this.mProfile.onClientConnected(bdaddr, isConnected);
+            mProfile.onClientConnected(bdaddr, isConnected);
             if (isConnected)
-                this.mProfile.mConnMap.put(bdaddr, Integer.valueOf(connId));
+                mProfile.mConnMap.put(bdaddr, Integer.valueOf(connId));
             else
-                this.mProfile.mConnMap.remove(bdaddr);
+                mProfile.mConnMap.remove(bdaddr);
         }
 
         public void onAttributeMtuExchange(String address, int connId, int transId, int mtuSize)
@@ -264,7 +266,7 @@ public abstract class BleServerProfile
 
         public void onAppRegisterCompleted(int status, int serIf) {
             Log.i("BleServerProfile", "onAppRegisterCompleted");
-            this.mProfile.onAppRegisterCompleted(status, serIf);
+            mProfile.onAppRegisterCompleted(status, serIf);
         }
 
     }
@@ -275,7 +277,7 @@ public abstract class BleServerProfile
         private Context context;
 
         private GattServiceConnection(Context c) {
-            this.context = c;
+            context = c;
         }
 
         public void onServiceConnected(ComponentName name, IBinder service)

@@ -7,6 +7,12 @@ import android.util.Log;
 
 import java.util.HashMap;
 
+/**
+ * Represents a characteristic descriptor. This class is a data container that
+ * allows easy access to characteristic descriptor values. A GATT characteristic
+ * may contain multiple descriptor values containing related information about a
+ * characteristic.
+ */
 public class BleDescriptor extends BleAttribute
         implements Parcelable
 {
@@ -14,6 +20,10 @@ public class BleDescriptor extends BleAttribute
     private BleCharacteristic mCharObj;
     protected HashMap<String, Integer> mClientcfgMap = new HashMap();
 
+    /** @hide */
+    @SuppressWarnings({
+            "unchecked", "rawtypes"
+    })
     public static final Parcelable.Creator<BleDescriptor> CREATOR = new Parcelable.Creator()
     {
         public BleDescriptor createFromParcel(Parcel source) {
@@ -42,6 +52,12 @@ public class BleDescriptor extends BleAttribute
         this.mCharObj = charObj;
     }
 
+    /**
+     * Set the raw value bytes for this descriptor starting at a given offset,
+     * 
+     * @return {@link BleConstants#GATT_SUCCESS if successful}
+     */
+    @Override
     public byte setValue(byte[] value, int offset, int length, BleGattID gattUuid,
             int totalSize, String address)
     {

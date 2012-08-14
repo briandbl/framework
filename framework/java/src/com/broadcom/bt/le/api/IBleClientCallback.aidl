@@ -3,16 +3,16 @@ package com.broadcom.bt.le.api;
 import com.broadcom.bt.service.gatt.BluetoothGattID;
 
 interface IBleClientCallback {
-    void onAppRegistered(byte paramByte1, byte paramByte2);
+    void onAppRegistered(byte status, byte serIf);
 
-    void onAppDeregistered(byte paramByte);
+    void onAppDeregistered(byte client_if);
 
-    void onConnected(in String paramString, int paramInt);
+    void onConnected(in String address, int connId);
     
-    void onDisconnected(int paramInt, in String paramString);
+    void onDisconnected(int connId, in String address);
 
-    void onSearchResult(int paramInt, in BluetoothGattID id);
+    void onSearchResult(int connId, in BluetoothGattID srvcId);
 
-    void onSearchCompleted(int paramInt1, int paramInt2);
+    void onSearchCompleted(int connID, int status);
 
 }
