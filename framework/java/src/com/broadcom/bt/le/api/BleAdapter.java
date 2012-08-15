@@ -21,7 +21,7 @@ public class BleAdapter
 {
     private static final String TAG = "BleAdapter";
     private static final int API_LEVEL = 5;
-    private IBluetoothGatt mService;
+    private static IBluetoothGatt mService;
     private GattServiceConnection mSvcConn;
     private Context mContext;
 
@@ -79,14 +79,11 @@ public class BleAdapter
 
     /**
      * Constructs a new BleAdapter object
-     * 
-     * @hide
      */
     public BleAdapter(Context ctx) {
         this.mContext = ctx;
-        /**
-         * TODO implement
-         */
+        mService = (IBluetoothGatt)ctx.getSystemService("btle");
+        this.init();
     }
 
     /**
@@ -109,12 +106,14 @@ public class BleAdapter
      */
     public static byte getDeviceType(BluetoothDevice device)
     {
-        if (device != null)
-            /**
-             * TODO: fixme!
-             */
-            // return device.getDeviceType();
-            return 0;
+        if (device != null && mService != null){
+            try {
+                return mService.getDeviceType(device.getAddress());
+            } catch (RemoteException e) {
+                Log.e(TAG, "error", e);
+            }
+        }
+        
         return 0;
     }
 

@@ -18,7 +18,6 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-		java/src/android/bluetooth/le/IBluetoothLE.aidl \
 		java/src/com/broadcom/bt/le/api/IBleServiceEventHandler.aidl \
 		java/src/com/broadcom/bt/le/api/IBleServiceCallback.aidl \
 		java/src/com/broadcom/bt/le/api/IBleProfileEventCallback.aidl \

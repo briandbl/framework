@@ -20,11 +20,11 @@ import java.util.Map;
 public interface Device extends DBusInterface {
 
     /*
-     * Methods from adapter-api.txt
+     * Methods from device-api.txt
      */
 
     /**
-     * Properties from Adapter 
+     * Properties from device 
      * 
      * String Address [readonly] 
      * String Name [readonly]

@@ -1,5 +1,9 @@
 package android.bluetooth.le.server;
 
+import android.app.ActivityManagerNative;
+import android.app.ActivityThread;
+import android.app.IActivityManager;
+import android.content.Context;
 import android.os.IServiceManager;
 import android.os.Looper;
 import android.os.Process;
@@ -18,6 +22,9 @@ class ServerThread extends Thread {
     
     @Override
     public void run(){
+        /**
+         * Not in use right now.
+         */
         Looper.prepareMainLooper();
 
         Process.setThreadPriority(
@@ -42,8 +49,7 @@ class ServerThread extends Thread {
             e1.printStackTrace();
         }
         
-        Service s = new Service();
-        ServiceManager.addService("btle", s);
+       
         
         try {
             Log.i(TAG, "Started Bluetooth Service");
@@ -63,8 +69,11 @@ public class Main {
     {
    
         Looper.prepareMainLooper();
-        try {
-            Service s = new Service();
+        try { 
+            ActivityThread at = ActivityThread.systemMain();
+            Context c = at.getSystemContext();
+            
+            BluetoothGatt s = new BluetoothGatt(c);
             ServiceManager.addService("btle", s);
         } catch (Exception e1) {
             // TODO Auto-generated catch block
