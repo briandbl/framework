@@ -11,6 +11,7 @@ import android.content.IIntentReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -28,7 +29,9 @@ import com.broadcom.bt.service.gatt.IBluetoothGatt;
 
 import org.freedesktop.dbus.Variant;
 
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface.Listener {
     private BlueZInterface iface;
@@ -177,6 +180,17 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssi);
         intent.putExtra(BleAdapter.EXTRA_DEVICE_TYPE, BleAdapter.DEVICE_TYPE_BLE);
         broadcastIntent(intent);
+    }
+    
+    @Override
+    public void getUUIDs(String address) throws RemoteException {
+        List<String> uuids = iface.getUUIDs(address);
+        for (String u: uuids){
+            Intent intent = new Intent(BleAdapter.ACTION_UUID);
+            intent.putExtra(BleAdapter.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
+            intent.putExtra(BleAdapter.EXTRA_UUID, new ParcelUuid(UUID.fromString(u)));
+            broadcastIntent(intent);
+        }
     }
 
     @Override

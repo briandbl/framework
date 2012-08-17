@@ -13,6 +13,8 @@ import com.broadcom.bt.le.api.IBleProfileEventCallback;
 interface IBluetoothGatt {
 
 	byte getDeviceType(in String address);
+
+    void getUUIDs(in String address);
 	
 	void registerApp(in BluetoothGattID appUuid,
                      in IBleClientCallback callback);

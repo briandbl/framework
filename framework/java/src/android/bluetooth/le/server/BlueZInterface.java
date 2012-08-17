@@ -18,8 +18,10 @@ import org.freedesktop.dbus.DBusSigHandler;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusException;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -254,5 +256,19 @@ public class BlueZInterface {
         } catch(Error.InvalidArguments e2){
             throw new RuntimeException("Invalid address " + e2.toString());
         }
+    }
+    
+    @SuppressWarnings("unchecked")
+    public List<String> getUUIDs(String address){
+        ArrayList<String> out = new ArrayList<String>();
+        Map<String, Variant> temp = getDeviceProperties(address);
+        
+        if (temp.containsKey("UUIDs")){
+            List<String> t = (List<String>)temp.get("UUIDs").getValue();
+            for(String k: t)
+                out.add(k);
+        }
+        
+        return out;
     }
 }
