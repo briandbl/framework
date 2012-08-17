@@ -17,15 +17,12 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES = $(call all-java-files-under, java/src )
-#LOCAL_SRC_FILES += 
-
-LOCAL_STATIC_JAVA_LIBRARIES := java-dbus btle-api
+LOCAL_SRC_FILES := $(call all-subdir-java-files, java)
 
 LOCAL_NO_STANDARD_LIBRARIES := true
-LOCAL_JAVA_LIBRARIES := bouncycastle core ext framework
+LOCAL_JAVA_LIBRARIES := framework
 
-LOCAL_MODULE := btle-framework
+LOCAL_MODULE := java-dbus
 LOCAL_MODULE_CLASS := JAVA_LIBRARIES
 
 LOCAL_NO_EMMA_INSTRUMENT := true
@@ -34,4 +31,4 @@ LOCAL_NO_EMMA_COMPILE := true
 LOCAL_DX_FLAGS := --core-library
 LOCAL_MODULE_TAGS := optional
 
-include $(BUILD_JAVA_LIBRARY)
+include $(BUILD_STATIC_JAVA_LIBRARY)
