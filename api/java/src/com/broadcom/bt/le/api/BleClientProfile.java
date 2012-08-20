@@ -5,10 +5,10 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.ServiceManager;
 import android.util.Log;
 
 import com.broadcom.bt.service.gatt.BluetoothGattID;
@@ -58,7 +58,7 @@ public abstract class BleClientProfile
      */
     public BleClientProfile(Context context, BleGattID profileUuid)
     {
-        Log.d("BleClientProfile", "BleClientProfile " + profileUuid.toString());
+        Log.d(TAG, "new profile" + profileUuid.toString());
 
         this.mContext = context;
         this.mAppUuid = profileUuid;
@@ -71,7 +71,7 @@ public abstract class BleClientProfile
         this.mDeviceToClientIDMap = new HashMap<BluetoothDevice, Integer>();
 
         this.mCallback = new BleClientCallback();
-        this.mSvcConn = new GattServiceConnection(null);
+        this.mSvcConn = new GattServiceConnection(context);
     }
 
     /**
@@ -89,15 +89,16 @@ public abstract class BleClientProfile
     public void init(ArrayList<BleClientService> requiredServices,
             ArrayList<BleClientService> optionalServices)
     {
-        Log.d("BleClientProfile", "init (" + this.mAppUuid + ")");
+        Log.d(TAG, "init (" + this.mAppUuid + ")");
 
         this.mRequiredServices = requiredServices;
         this.mOptionalServices = optionalServices;
 
-        Intent i = new Intent();
-        i.setClassName("com.broadcom.bt.app.system",
-                "com.broadcom.bt.app.system.GattService");
-        this.mContext.bindService(i, this.mSvcConn, 1);
+        IBinder b = ServiceManager.getService(BleConstants.BLUETOOTH_LE_SERVICE);
+        if (b == null) {
+            throw new RuntimeException("Bluetooth Low Energy service not available");
+        }
+        this.mSvcConn.onServiceConnected(null, b);
     }
 
     /**
@@ -125,7 +126,7 @@ public abstract class BleClientProfile
      */
     public boolean isProfileRegistered()
     {
-        Log.d("BleClientProfile", "isProfileRegistered (" + this.mAppUuid + ")");
+        Log.d(TAG, "isProfileRegistered (" + this.mAppUuid + ")");
         return this.mClientIf != BleConstants.GATT_SERVICE_PRIMARY;
     }
 
@@ -139,7 +140,7 @@ public abstract class BleClientProfile
     public int registerProfile()
     {
         int ret = BleConstants.GATT_SUCCESS;
-        Log.d("BleClientProfile", "registerProfile (" + this.mAppUuid + ")");
+        Log.d(TAG, "registerProfile (" + this.mAppUuid + ")");
 
         if (this.mClientIf == BleConstants.GATT_SERVICE_PRIMARY)
         {
@@ -147,7 +148,7 @@ public abstract class BleClientProfile
             {
                 this.mService.registerApp(this.mAppUuid, this.mCallback);
             } catch (RemoteException e) {
-                Log.e("BleClientProfile", e.toString());
+                Log.e(TAG, e.toString());
                 ret = BleConstants.SERVICE_UNAVAILABLE;
             }
         }
@@ -160,13 +161,13 @@ public abstract class BleClientProfile
      */
     public void deregisterProfile()
     {
-        Log.d("BleClientProfile", "deregisterProfile (" + this.mAppUuid + ")");
+        Log.d(TAG, "deregisterProfile (" + this.mAppUuid + ")");
 
         if (this.mClientIf != BleConstants.GATT_SERVICE_PRIMARY)
             try {
                 this.mService.unregisterApp(this.mClientIf);
             } catch (RemoteException e) {
-                Log.e("BleClientProfile", "deregisterProfile() - " + e.toString());
+                Log.e(TAG, "deregisterProfile() - " + e.toString());
             }
     }
 
@@ -184,7 +185,7 @@ public abstract class BleClientProfile
         {
             this.mService.setEncryption(device.getAddress(), action);
         } catch (RemoteException e) {
-            Log.e("BleClientProfile", e.toString());
+            Log.e(TAG, e.toString());
         }
     }
 
@@ -201,7 +202,7 @@ public abstract class BleClientProfile
         {
             this.mService.setScanParameters(scanInterval, scanWindow);
         } catch (RemoteException e) {
-            Log.e("BleClientProfile", e.toString());
+            Log.e(TAG, e.toString());
         }
     }
 
@@ -217,7 +218,7 @@ public abstract class BleClientProfile
      */
     public int connect(BluetoothDevice device)
     {
-        Log.d("BleClientProfile", "connect (" + this.mAppUuid + ")" + device.getAddress());
+        Log.d(TAG, "connect (" + this.mAppUuid + ")" + device.getAddress());
 
         int ret = BleConstants.GATT_SUCCESS;
 
@@ -232,7 +233,7 @@ public abstract class BleClientProfile
         {
             this.mService.open(this.mClientIf, device.getAddress(), true);
         } catch (RemoteException e) {
-            Log.e("BleClientProfile", e.toString());
+            Log.e(TAG, e.toString());
             ret = BleConstants.GATT_ERROR;
         }
 
@@ -257,7 +258,7 @@ public abstract class BleClientProfile
      */
     public int connectBackground(BluetoothDevice device)
     {
-        Log.d("BleClientProfile",
+        Log.d(TAG,
                 "connectBackground (" + this.mAppUuid + ")" + device.getAddress());
 
         int ret = BleConstants.GATT_SUCCESS;
@@ -273,7 +274,7 @@ public abstract class BleClientProfile
         {
             this.mService.open(this.mClientIf, device.getAddress(), false);
         } catch (RemoteException e) {
-            Log.e("BleClientProfile", e.toString());
+            Log.e(TAG, e.toString());
             ret = BleConstants.GATT_ERROR;
         }
 
@@ -289,7 +290,7 @@ public abstract class BleClientProfile
      */
     public int cancelBackgroundConnection(BluetoothDevice device)
     {
-        Log.d("BleClientProfile", "cancelBackgroundConnection (" + this.mAppUuid
+        Log.d(TAG, "cancelBackgroundConnection (" + this.mAppUuid
                 + ") - device " + device.getAddress());
 
         int ret = BleConstants.GATT_SUCCESS;
@@ -297,7 +298,7 @@ public abstract class BleClientProfile
         {
             this.mService.close(this.mClientIf, device.getAddress(), 0, false);
         } catch (RemoteException e) {
-            Log.e("BleClientProfile", e.toString());
+            Log.e(TAG, e.toString());
             ret = BleConstants.GATT_ERROR;
         }
 
@@ -313,7 +314,7 @@ public abstract class BleClientProfile
      */
     public int disconnect(BluetoothDevice device)
     {
-        Log.d("BleClientProfile",
+        Log.d(TAG,
                 "disconnect (" + this.mAppUuid + ") - device " + device.getAddress());
 
         synchronized (this.mDisconnectingDevices) {
@@ -323,12 +324,12 @@ public abstract class BleClientProfile
         int ret = BleConstants.GATT_SUCCESS;
         try
         {
-            this.mService.close(this.mClientIf, 
+            this.mService.close(this.mClientIf,
                     device.getAddress(),
-                    ((Integer) this.mDeviceToClientIDMap.get(device)).intValue(), 
+                    ((Integer) this.mDeviceToClientIDMap.get(device)).intValue(),
                     true);
         } catch (RemoteException e) {
-            Log.e("BleClientProfile", e.toString());
+            Log.e(TAG, e.toString());
             ret = BleConstants.GATT_ERROR;
         }
         return ret;
@@ -345,17 +346,16 @@ public abstract class BleClientProfile
      */
     public int refresh(BluetoothDevice device)
     {
-        Log.d("BleClientProfile",
+        Log.d(TAG,
                 "refresh (" + this.mAppUuid + ") - address = " + device.getAddress());
 
         if (isDeviceDisconnecting(device)) {
-            Log.d("BleClientProfile", "refresh (" + this.mAppUuid
+            Log.d(TAG, "refresh (" + this.mAppUuid
                     + ") - Device unavailable!");
             return BleConstants.GATT_ERROR;
         }
 
-        ((BleClientService) this.mRequiredServices.get(
-                BleConstants.GATT_SERVICE_PRIMARY)).refresh(device);
+        this.mRequiredServices.get(BleConstants.GATT_SERVICE_PRIMARY).refresh(device);
 
         return BleConstants.GATT_SUCCESS;
     }
@@ -366,7 +366,7 @@ public abstract class BleClientProfile
      */
     public int refreshService(BluetoothDevice device, BleClientService service)
     {
-        Log.d("BleClientProfile", "refreshService (" + this.mAppUuid + ") address = s "
+        Log.d(TAG, "refreshService (" + this.mAppUuid + ") address = s "
                 + device.getAddress() + "service = " + service.getServiceId());
 
         return 0;
@@ -494,7 +494,7 @@ public abstract class BleClientProfile
     {
         int i = this.mRequiredServices.indexOf(s);
         if (i + 1 < this.mRequiredServices.size()) {
-            Log.d("BleClientProfile", "Refreshing next service");
+            Log.d(TAG, "Refreshing next service");
             ((BleClientService) this.mRequiredServices.get(i + 1)).refresh(device);
         } else {
             onRefreshed(device);
@@ -511,7 +511,7 @@ public abstract class BleClientProfile
      */
     public void onInitialized(boolean success)
     {
-        Log.d("BleClientProfile", "onInitialized");
+        Log.d(TAG, "onInitialized");
         if (success)
             registerProfile();
     }
@@ -526,7 +526,7 @@ public abstract class BleClientProfile
      */
     public void onProfileRegistered()
     {
-        Log.d("BleClientProfile", "onProfileRegistered");
+        Log.d(TAG, "onProfileRegistered");
     }
 
     /**
@@ -536,7 +536,7 @@ public abstract class BleClientProfile
      */
     public void onProfileDeregistered()
     {
-        Log.d("BleClientProfile", "onProfileDeregistered");
+        Log.d(TAG, "onProfileDeregistered");
     }
 
     /**
@@ -553,7 +553,7 @@ public abstract class BleClientProfile
      */
     public void onDeviceConnected(BluetoothDevice device)
     {
-        Log.d("BleClientProfile", "onDeviceConnected");
+        Log.d(TAG, "onDeviceConnected");
         refresh(device);
     }
 
@@ -566,7 +566,7 @@ public abstract class BleClientProfile
      */
     public void onDeviceDisconnected(BluetoothDevice device)
     {
-        Log.d("BleClientProfile", "onDeviceDisconnected");
+        Log.d(TAG, "onDeviceDisconnected");
     }
 
     /**
@@ -577,7 +577,7 @@ public abstract class BleClientProfile
      */
     public void onRefreshed(BluetoothDevice device)
     {
-        Log.d("BleClientProfile", "onRefreshed");
+        Log.d(TAG, "onRefreshed");
     }
 
     private class GattServiceConnection
@@ -591,34 +591,34 @@ public abstract class BleClientProfile
 
         public void onServiceConnected(ComponentName name, IBinder service)
         {
-            Log.d("BleClientProfile", "Connected to GattService!");
+            Log.d(TAG, "Connected to GattService!");
 
             if (service != null)
                 try {
                     BleClientProfile.this.mService = IBluetoothGatt.Stub.asInterface(service);
 
                     for (int i = 0; i < BleClientProfile.this.mRequiredServices.size(); i++) {
-                        ((BleClientService) BleClientProfile.this.mRequiredServices.get(i))
+                        BleClientProfile.this.mRequiredServices.get(i)
                                 .setProfile(BleClientProfile.this);
                     }
 
                     if (BleClientProfile.this.mOptionalServices != null) {
                         for (int i = 0; i < BleClientProfile.this.mOptionalServices.size(); i++) {
-                            ((BleClientService) BleClientProfile.this.mOptionalServices
-                                    .get(i)).setProfile(BleClientProfile.this);
+                            BleClientProfile.this.mOptionalServices
+                                    .get(i).setProfile(BleClientProfile.this);
                         }
                     }
 
                     BleClientProfile.this.onInitialized(true);
                 } catch (Throwable t) {
-                    Log.e("BleClientProfile", "Unable to get Binder to GattService", t);
+                    Log.e(TAG, "Unable to get Binder to GattService", t);
                     BleClientProfile.this.onInitialized(false);
                 }
         }
 
         public void onServiceDisconnected(ComponentName name)
         {
-            Log.d("BleClientProfile", "Disconnected from GattService!");
+            Log.d(TAG, "Disconnected from GattService!");
         }
 
     }
@@ -631,7 +631,7 @@ public abstract class BleClientProfile
 
         public void onAppRegistered(byte status, byte client_if)
         {
-            Log.d("BleClientProfile", "BleClientCallback::onAppRegistered ("
+            Log.d(TAG, "BleClientCallback::onAppRegistered ("
                     + BleClientProfile.this.mAppUuid + ") status = " + status + " client_if = "
                     + client_if);
 
@@ -640,7 +640,7 @@ public abstract class BleClientProfile
         }
 
         public void onAppDeregistered(byte client_if) {
-            Log.d("BleClientProfile", "BleClientCallback::onAppDeregistered ("
+            Log.d(TAG, "BleClientCallback::onAppDeregistered ("
                     + BleClientProfile.this.mAppUuid + ") client_if = " + client_if);
 
             BleClientProfile.this.mClientIf = BleConstants.GATT_SERVICE_PRIMARY;
@@ -648,7 +648,7 @@ public abstract class BleClientProfile
         }
 
         public void onConnected(String deviceAddress, int connID) {
-            Log.d("BleClientProfile", "BleClientCallback::OnConnected ("
+            Log.d(TAG, "BleClientCallback::OnConnected ("
                     + BleClientProfile.this.mAppUuid + ") " + deviceAddress + "connID = " + connID);
 
             BluetoothDevice d = BleClientProfile.this
@@ -671,7 +671,7 @@ public abstract class BleClientProfile
             }
 
             if (d.getBondState() == BluetoothDevice.BOND_BONDED) {
-                Log.d("BleClientProfile",
+                Log.d(TAG,
                         "onConnected device is bonded start encrypt the  link");
                 BleClientProfile.this.setEncryption(d, (byte) 1);
             }
@@ -683,13 +683,13 @@ public abstract class BleClientProfile
             {
                 BleClientProfile.this.mService.searchService(connID, null);
             } catch (RemoteException e) {
-                Log.d("BleClientProfile", "Error calling searchService " + e.toString());
+                Log.d(TAG, "Error calling searchService " + e.toString());
             }
         }
 
         public void onDisconnected(int connID, String deviceAddress)
         {
-            Log.d("BleClientProfile", "BleClientCallback::onDisconnected ("
+            Log.d(TAG, "BleClientCallback::onDisconnected ("
                     + BleClientProfile.this.mAppUuid + ") connID = " + connID);
 
             BleClientProfile.this
@@ -706,7 +706,7 @@ public abstract class BleClientProfile
         }
 
         public void onSearchResult(int connID, BluetoothGattID srvcId) {
-            Log.d("BleClientProfile", "BleClientCallback::onSearchResult ("
+            Log.d(TAG, "BleClientCallback::onSearchResult ("
                     + BleClientProfile.this.mAppUuid + ") connID = " + connID + " svcId: id = "
                     + srvcId.toString() + " inst id = " + srvcId.getInstanceID());
 
@@ -714,19 +714,19 @@ public abstract class BleClientProfile
         }
 
         public void onSearchCompleted(int connID, int status) {
-            Log.d("BleClientProfile", "BleClientCallback::onSearchCompleted ("
+            Log.d(TAG, "BleClientCallback::onSearchCompleted ("
                     + BleClientProfile.this.mAppUuid + ") connID = " + connID + "status = "
                     + status);
 
             int nServicesFound = 0;
 
             if (BleClientProfile.this.mRequiredServices == null) {
-                Log.d("BleClientProfile", "mRequiredServices is null");
+                Log.d(TAG, "mRequiredServices is null");
                 return;
             }
 
             if (BleClientProfile.this.mPeerServices == null) {
-                Log.d("BleClientProfile", "mPeerServices is null");
+                Log.d(TAG, "mPeerServices is null");
                 return;
             }
 
@@ -734,39 +734,38 @@ public abstract class BleClientProfile
                 for (int j = 0; j < BleClientProfile.this.mPeerServices.size(); j++) {
                     if (((BleGattID) BleClientProfile.this.mPeerServices.get(j))
                             .toString().equalsIgnoreCase(
-                                    ((BleClientService) BleClientProfile.this.mRequiredServices
-                                            .get(i)).getServiceId().toString())) {
-                        ((BleClientService) BleClientProfile.this.mRequiredServices.get(i))
+                                    BleClientProfile.this.mRequiredServices
+                                            .get(i).getServiceId().toString())) {
+                        BleClientProfile.this.mRequiredServices.get(i)
                                 .setInstanceID(
-                                        (BluetoothDevice) BleClientProfile.this.mClientIDToDeviceMap
-                                                .get(new Integer(connID)),
-                                        ((BleGattID) BleClientProfile.this.mPeerServices.get(j))
-                                                .getInstanceID());
+                                        BleClientProfile.this.mClientIDToDeviceMap.get(new Integer(
+                                                connID)),
+                                        BleClientProfile.this.mPeerServices.get(j).getInstanceID());
                         nServicesFound++;
                         break;
                     }
                 }
             }
 
-            Log.d("BleClientProfile", "BleClientCallback::onSearchResult - found "
+            Log.d(TAG, "BleClientCallback::onSearchResult - found "
                     + nServicesFound + " out of " + BleClientProfile.this.mRequiredServices.size()
                     + " services needed for this profile");
             BluetoothDevice device = (BluetoothDevice) BleClientProfile.this.mClientIDToDeviceMap
                     .get(new Integer(connID));
 
             if (device == null) {
-                Log.d("BleClientProfile",
+                Log.d(TAG,
                         "No bluetooth device in the device map for connid = " + connID);
             }
             else if (BleClientProfile.this.isDeviceDisconnecting(device)) {
-                Log.d("BleClientProfile", "Device disconnecting...");
+                Log.d(TAG, "Device disconnecting...");
             }
             else if (nServicesFound == BleClientProfile.this.mRequiredServices.size()) {
-                Log.d("BleClientProfile",
+                Log.d(TAG,
                         "the num of Srvs found match the required srv size ");
                 BleClientProfile.this.onDeviceConnected(device);
             } else {
-                Log.d("BleClientProfile",
+                Log.d(TAG,
                         "the num of Srvs found DOES NOT match the required srv size ");
             }
         }

@@ -1,7 +1,10 @@
+
 package com.broadcom.bt.service.gatt;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+
+import com.broadcom.bt.le.api.BleConstants;
 
 import java.util.UUID;
 
@@ -25,7 +28,7 @@ public class BluetoothGattID
             int type = source.readInt();
             int serviceType = source.readInt();
 
-            if (type == 16) {
+            if (type == BleConstants.GATT_UUID_TYPE_128) {
                 String sUuid = source.readString();
                 return new BluetoothGattID(instId, sUuid, serviceType);
             }
@@ -42,7 +45,8 @@ public class BluetoothGattID
 
     private void initServiceType(int serviceType)
     {
-        if ((serviceType == 0) || (serviceType == 1))
+        if ((serviceType == BleConstants.GATT_SERVICE_PRIMARY)
+                || (serviceType == BleConstants.GATT_SERVICE_SECONDARY))
         {
             this.mServiceType = serviceType;
         }
@@ -52,7 +56,7 @@ public class BluetoothGattID
     {
         this.mInstId = instId;
         this.mUuid128 = uuid;
-        this.mType = 16;
+        this.mType = BleConstants.GATT_UUID_TYPE_128;
     }
 
     public BluetoothGattID(int instId, UUID uuid, int serviceType) {
@@ -64,16 +68,16 @@ public class BluetoothGattID
     {
         this.mInstId = instId;
         this.mUuid128 = new UUID(uuidMsb, uuidLsb);
-        this.mType = 16;
+        this.mType = BleConstants.GATT_UUID_TYPE_128;
     }
 
     public BluetoothGattID(long uuidLsb, long uuidMsb, int uuidType) {
-        if (uuidType == 16) {
+        if (uuidType == BleConstants.GATT_UUID_TYPE_128) {
             this.mUuid128 = new UUID(uuidMsb, uuidLsb);
-            this.mType = 16;
+            this.mType = BleConstants.GATT_UUID_TYPE_128;
         } else {
             this.mUuid16 = (int) uuidLsb;
-            this.mType = 2;
+            this.mType = BleConstants.GATT_UUID_TYPE_16;
         }
     }
 
@@ -97,7 +101,7 @@ public class BluetoothGattID
     public BluetoothGattID(int instId, String sUUID) {
         this.mInstId = instId;
         this.mUuid128 = UUID.fromString(sUUID);
-        this.mType = 16;
+        this.mType = BleConstants.GATT_UUID_TYPE_128;
     }
 
     public BluetoothGattID(int instId, String sUUID, int serviceType) {
@@ -109,7 +113,7 @@ public class BluetoothGattID
     {
         this.mInstId = instId;
         this.mUuid16 = uuid;
-        this.mType = 2;
+        this.mType = BleConstants.GATT_UUID_TYPE_16;
     }
 
     public BluetoothGattID(int instId, int iUUID, int serviceType) {
@@ -120,7 +124,7 @@ public class BluetoothGattID
     public BluetoothGattID(UUID uuid)
     {
         this.mUuid128 = uuid;
-        this.mType = 16;
+        this.mType = BleConstants.GATT_UUID_TYPE_128;
     }
 
     public BluetoothGattID(UUID uuid, int serviceType) {
@@ -130,7 +134,7 @@ public class BluetoothGattID
 
     public BluetoothGattID(String sUUID) {
         this.mUuid128 = UUID.fromString(sUUID);
-        this.mType = 16;
+        this.mType = BleConstants.GATT_UUID_TYPE_128;
     }
 
     public BluetoothGattID(String sUUID, int serviceType) {
@@ -141,7 +145,7 @@ public class BluetoothGattID
     public BluetoothGattID(int uuid)
     {
         this.mUuid16 = uuid;
-        this.mType = 2;
+        this.mType = BleConstants.GATT_UUID_TYPE_16;
     }
 
     public UUID getUuid()
@@ -179,20 +183,20 @@ public class BluetoothGattID
     }
 
     public long getLeastSignificantBits() {
-        if (this.mType == 16)
+        if (this.mType == BleConstants.GATT_UUID_TYPE_128)
             return this.mUuid128.getLeastSignificantBits();
         return this.mUuid16;
     }
 
     public long getMostSignificantBits() {
-        if (this.mType == 16)
+        if (this.mType == BleConstants.GATT_UUID_TYPE_128)
             return this.mUuid128.getMostSignificantBits();
         return 0L;
     }
 
     public int hashCode()
     {
-        if (this.mType == 16) {
+        if (this.mType == BleConstants.GATT_UUID_TYPE_128) {
             return this.mUuid128.hashCode();
         }
         return new Integer(this.mUuid16).hashCode();
@@ -218,13 +222,15 @@ public class BluetoothGattID
         if (this.mServiceType != targetId.getServiceType()) {
             return false;
         }
-        if ((this.mType == 16) && (targetId.getInstanceID() == this.mInstId)
+        if ((this.mType == BleConstants.GATT_UUID_TYPE_128)
+                && (targetId.getInstanceID() == this.mInstId)
                 && (this.mUuid128.equals(targetId.getUuid())))
         {
             return true;
         }
 
-        return (this.mType == 2) && (targetId.getInstanceID() == this.mInstId)
+        return (this.mType == BleConstants.GATT_UUID_TYPE_16)
+                && (targetId.getInstanceID() == this.mInstId)
                 && (this.mUuid16 == targetId.getUuid16());
     }
 
@@ -238,7 +244,7 @@ public class BluetoothGattID
         dest.writeInt(this.mType);
         dest.writeInt(this.mServiceType);
 
-        if (this.mType == 16)
+        if (this.mType == BleConstants.GATT_UUID_TYPE_128)
             dest.writeString(this.mUuid128.toString());
         else
             dest.writeInt(this.mUuid16);
@@ -246,7 +252,7 @@ public class BluetoothGattID
 
     public String toString()
     {
-        if (this.mType == 16) {
+        if (this.mType == BleConstants.GATT_UUID_TYPE_128) {
             return this.mUuid128 == null ? null : this.mUuid128.toString();
         }
         return String.valueOf(String.format("%08x-0000-1000-8000-00805f9b34fb",
@@ -254,5 +260,8 @@ public class BluetoothGattID
                     Integer.valueOf(this.mUuid16)
                 }));
     }
-
+    
+    public static BluetoothGattID getUuuid128FromUuid16(int uuid16){
+        return new BluetoothGattID(new BluetoothGattID(uuid16).toString());
+    }
 }

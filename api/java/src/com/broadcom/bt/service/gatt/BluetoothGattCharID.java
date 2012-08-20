@@ -96,5 +96,9 @@ public final class BluetoothGattCharID
         else
             dest.writeInt(this.mCharId.getUuid16());
     }
+    
+    public String toString(){
+        return "CharID " + this.getCharId() + " " + this.getSrvcId();
+    }
 
 }

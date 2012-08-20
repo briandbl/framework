@@ -64,35 +64,43 @@ public class BleAdapter
      * <li>Always contains the extra field {@link #EXTRA_UUID}</li>
      * </ul>
      */
-    public static final String ACTION_UUID = "android.bluetooth.device.action.UUID";
+    public static final String ACTION_UUID = "android.bluetooth.le.device.action.UUID";
 
     /**
      * Used as an extra field in {@link #ACTION_UUID} intents, Contains the
      * android.os.ParcelUuid's of the remote device which is a parcelable
      * version of a UUID.
      */
-    public static final String EXTRA_UUID = "android.bluetooth.device.extra.UUID";
+    public static final String EXTRA_UUID = "android.bluetooth.le.device.extra.UUID";
 
     /**
      * Used as a Parcelable BluetoothDevice extra field in every intent
      * broadcast by this class. It contains the BluetoothDevice that the intent
      * applies to.
      */
-    public static final String EXTRA_DEVICE = "android.bluetooth.device.extra.DEVICE";
+    public static final String EXTRA_DEVICE = "android.bluetooth.le.device.extra.DEVICE";
+
+    private static boolean startService() {
+        if (mService != null)
+            return true;
+        IBinder service = ServiceManager.getService(BleConstants.BLUETOOTH_LE_SERVICE);
+        if (service != null)
+            mService = IBluetoothGatt.Stub.asInterface(service);
+        return mService != null;
+    }
 
     /**
      * Constructs a new BleAdapter object
      */
     public BleAdapter(Context ctx) {
         this.mContext = ctx;
-        IBinder service = ServiceManager.getService("btle");
-        if (service!=null)
-            mService = IBluetoothGatt.Stub.asInterface(service);
+        if (startService()==false)
+            throw new RuntimeException("failed connecting to service");
         this.init();
     }
 
     public static boolean checkAPIAvailability() {
-        return ServiceManager.getService("btle") != null;
+        return startService();
     }
 
     /**
@@ -115,7 +123,9 @@ public class BleAdapter
      */
     public static byte getDeviceType(BluetoothDevice device)
     {
-        if (device != null && mService != null) {
+        if (!startService())
+            throw new RuntimeException("service not available");
+        if (device != null) {
             try {
                 return mService.getDeviceType(device.getAddress());
             } catch (RemoteException e) {
@@ -137,6 +147,8 @@ public class BleAdapter
      */
     public static boolean getRemoteServices(String deviceAddress)
     {
+        if (!startService())
+            throw new RuntimeException("service not available");
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null)
             return false;

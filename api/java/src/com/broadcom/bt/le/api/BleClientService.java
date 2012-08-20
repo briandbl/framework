@@ -624,15 +624,26 @@ public abstract class BleClientService
         int ret = BleConstants.GATT_SUCCESS;
         int connID = BleConstants.GATT_INVALID_CONN_ID;
         Log.d(TAG, "readNextCharDescriptor address = " + remoteDevice.getAddress());
+        Log.d(TAG, "svcId " + svcId);
+        Log.d(TAG, "charId " + charId);
+        Log.d(TAG, "descId "  + descriptorId);
+        if (descriptorId == null)
+            descriptorId = charId;
+        
         BluetoothGattCharDescrID descId = new BluetoothGattCharDescrID(svcId, charId,
                 descriptorId);
         try
         {
-            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID)
-                mProfile.getGattService().getNextCharDescr(connID, descId, null);
+            if ((connID = mProfile.getConnIdForDevice(remoteDevice)) != BleConstants.GATT_INVALID_CONN_ID) {
+                try {
+                    mProfile.getGattService().getNextCharDescr(connID, descId, descriptorId);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
             else
                 ret = BleConstants.GATT_INVALID_CONN_ID;
-        } catch (RemoteException e) {
+        } catch (Exception e) {
             Log.d(TAG, "getNextCharDescriptor " + e.toString());
             ret = BleConstants.GATT_ERROR;
         }
@@ -742,7 +753,8 @@ public abstract class BleClientService
                 s.characteristics.add(characteristic);
                 BleClientService.this.readFirstCharDescriptor(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+                        BleApiHelper.gatt2BleID(svcId),
+                        BleApiHelper.gatt2BleID(characteristicID));
             }
             else
             {
@@ -753,7 +765,9 @@ public abstract class BleClientService
                 {
                     BleClientService.this.readFirstCharacteristic(
                             BleClientService.this.mProfile.getDeviceforConnId(connID),
-                            new BleGattID(s.instanceID, svcId.getUuid(), svcId.getServiceType()));
+                            new BleGattID(s.instanceID, 
+                                    svcId.getUuid(), 
+                                    svcId.getServiceType()));
                 }
                 else
                 {
@@ -782,7 +796,8 @@ public abstract class BleClientService
             if (status != BleConstants.GATT_SUCCESS) {
                 BleClientService.this.readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+                        BleApiHelper.gatt2BleID(svcId),
+                        BleApiHelper.gatt2BleID(characteristicID));
                 return;
             }
 
@@ -845,6 +860,7 @@ public abstract class BleClientService
                 BluetoothGattID svcId, BluetoothGattID characteristicID,
                 BluetoothGattID descriptorID)
         {
+            Log.d(BleClientService.TAG, "onGetNextCharacteristicDescriptor");
             Log.d(BleClientService.TAG, "onGetNextCharacteristicDescriptor "
                     + characteristicID.toString() + " status = " + status);
 
@@ -928,9 +944,11 @@ public abstract class BleClientService
 
                 s.characteristics.add(characteristic);
 
-                BleClientService.this.readFirstCharDescriptor(
+                BleClientService.this.readNextCharDescriptor(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+                        BleApiHelper.gatt2BleID(svcId),
+                        BleApiHelper.gatt2BleID(characteristicID),
+                        null);
             }
             else
             {

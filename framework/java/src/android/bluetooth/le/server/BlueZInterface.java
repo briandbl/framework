@@ -4,17 +4,25 @@
 
 package android.bluetooth.le.server;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.server.handlers.DeviceFoundHandler;
+import android.os.RemoteException;
 import android.util.Log;
 
+import com.broadcom.bt.le.api.BleConstants;
+import com.broadcom.bt.service.gatt.BluetoothGattID;
+
 import org.bluez.Adapter;
+import org.bluez.Characteristic;
 import org.bluez.Device;
 import org.bluez.Error;
 import org.bluez.Manager;
+import org.bluez.Service;
 import org.freedesktop.DBus;
 import org.freedesktop.DBus.NameOwnerChanged;
 import org.freedesktop.dbus.DBusConnection;
 import org.freedesktop.dbus.DBusSigHandler;
+import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusException;
 
@@ -30,26 +38,45 @@ import java.util.Map;
 public class BlueZInterface {
     public interface Listener {
         public void deviceDiscovered(String address, String name, short rssi);
+
+        public void serviceDiscovered(int connID, String address, String uuid, String path);
+
+        // public void deviceCreated(String path);
+
+        public void serviceDiscoveredFinished(int connID, int status);
+
+        public void characteristicsSolved(int connID, String serPath,
+                List<Path> charPath, List<BluetoothGattID> uuids);
     }
-    
+
+    private static final String DBUS_BLUEZ = "org.bluez";
+
     static String TAG = "BluetoothLEService";
     private DBusConnection bus = null;
     private Manager manager = null;
     private Adapter adapter = null;
     private Listener listener = null;
+
+    private BluetoothAdapter mAndroidBluetoothAdapter;
+
+    public BlueZInterface(Listener listener, BluetoothAdapter mAndroidBluetoothAdapter) {
+        super();
+        this.listener = listener;
+        this.mAndroidBluetoothAdapter = mAndroidBluetoothAdapter;
+    }
+
     @SuppressWarnings("rawtypes")
-    
     private Map<Class, DBusSigHandler> listeners = new HashMap<Class, DBusSigHandler>();
 
-    public synchronized Listener getListener(){
+    public synchronized Listener getListener() {
         return listener;
     }
-    
-    public synchronized void setListener(Listener l){
+
+    public synchronized void setListener(Listener l) {
         this.listener = l;
     }
-    
-    public synchronized void removeListener(){
+
+    public synchronized void removeListener() {
         this.listener = null;
     }
 
@@ -76,7 +103,7 @@ public class BlueZInterface {
         }
         listeners.clear();
         bus.disconnect();
-        bus=null;
+        bus = null;
         Log.i(TAG, "disconnected from bus");
     }
 
@@ -94,9 +121,9 @@ public class BlueZInterface {
             bus = DBusConnection.getConnection(DBusConnection.SYSTEM);
 
             Log.i(TAG, "registering signals");
-            //DBusSigHandler s = new DBusOwnerNameChanged(this);
-            //bus.addSigHandler(NameOwnerChanged.class, s);
-            //listeners.put(NameOwnerChanged.class, s);
+            // DBusSigHandler s = new DBusOwnerNameChanged(this);
+            // bus.addSigHandler(NameOwnerChanged.class, s);
+            // listeners.put(NameOwnerChanged.class, s);
             Log.i(TAG, "dbus handlers registered");
             return;
         } catch (DBusException e) {
@@ -111,7 +138,7 @@ public class BlueZInterface {
 
         Manager out;
         try {
-            out = bus.getRemoteObject("org.bluez", "/", Manager.class);
+            out = bus.getRemoteObject(DBUS_BLUEZ, "/", Manager.class);
         } catch (DBusException e) {
             Log.e(TAG, "BlueZ isn't available", e);
             return null;
@@ -139,7 +166,7 @@ public class BlueZInterface {
         Adapter out;
         try {
             String p = manager.DefaultAdapter().toString();
-            out = bus.getRemoteObject("org.bluez", p, Adapter.class);
+            out = bus.getRemoteObject(DBUS_BLUEZ, p, Adapter.class);
         } catch (DBusException e) {
             Log.e(TAG, "BlueZ issue", e);
             return null;
@@ -152,7 +179,7 @@ public class BlueZInterface {
         return out;
     }
 
-    public String getAdapterPath() {
+    private String getAdapterPath() {
         if (manager == null)
             return null;
 
@@ -168,8 +195,7 @@ public class BlueZInterface {
         connectDBus();
         manager = getBluezManager();
         adapter = getBluezAdapter();
-        
-       
+
         try {
             DBusSigHandler s = new DeviceFoundHandler(this);
             bus.addSigHandler(org.bluez.Adapter.DeviceFound.class, s);
@@ -177,11 +203,11 @@ public class BlueZInterface {
         } catch (DBusException e) {
             Log.e(TAG, "failed registering for dbus signal", e);
         }
-        
+
         return adapter != null;
     }
-    
-    public synchronized boolean Start(){
+
+    public synchronized boolean Start() {
         return Start(false);
     }
 
@@ -193,21 +219,28 @@ public class BlueZInterface {
         return adapter != null;
     }
 
-    private String createDevice(String address){
+    private String createDevice(String address) {
         try {
-            return adapter.CreateDevice(address).toString();
+            Path d = adapter.CreateDevice(address);
+            if (d == null)
+                return null;
+            return d.toString();
         } catch (Error.Failed e1) {
             Log.e(TAG, "error", e1);
             return null;
         } catch (Error.InvalidArguments e2) {
             Log.e(TAG, "error", e2);
-            throw new RuntimeException("Invalid address "+e2.toString());
+            throw new RuntimeException("Invalid address " + e2.toString());
         }
     }
 
     private String findDevice(String address) {
+
         try {
-            return adapter.FindDevice(address).toString();
+            Path d = adapter.FindDevice(address);
+            if (d != null)
+                return d.toString();
+            return createDevice(address);
         } catch (Error.DoesNotExist e1) {
             return createDevice(address);
         } catch (Error.InvalidArguments e2) {
@@ -224,51 +257,170 @@ public class BlueZInterface {
         }
 
         String path = findDevice(address);
-        
+
         if (path == null)
             return null;
-        
+
         try {
-            return bus.getRemoteObject("org.bluez", path, Device.class);
+            return bus.getRemoteObject(DBUS_BLUEZ, path, Device.class);
         } catch (DBusException e) {
             Log.e(TAG, "error", e);
             throw new RuntimeException("Something failed " + e.toString());
         }
     }
-    
+
     @SuppressWarnings("rawtypes")
-    public Map<String, Variant> getDeviceProperties(String address){
+    public Map<String, Variant> getDeviceProperties(String address) {
         if (Status() == false) {
             if (Start() == false) {
                 throw new RuntimeException("Failed to connect to BlueZ");
             }
         }
-        
-        Device d = getDevice(address);
-        if (d==null)
+
+        Device d;
+        d = getDevice(address);
+
+        if (d == null)
             return null;
-        
+
         try {
             return d.GetProperties();
-        } catch (Error.DoesNotExist e1){
+        } catch (Error.DoesNotExist e1) {
             Log.e(TAG, "error", e1);
             return null;
-        } catch(Error.InvalidArguments e2){
+        } catch (Error.InvalidArguments e2) {
             throw new RuntimeException("Invalid address " + e2.toString());
         }
     }
-    
+
     @SuppressWarnings("unchecked")
-    public List<String> getUUIDs(String address){
+    public List<String> getUUIDs(String address) {
+        if (Status() == false) {
+            if (Start() == false) {
+                throw new RuntimeException("Failed to connect to BlueZ");
+            }
+        }
+
         ArrayList<String> out = new ArrayList<String>();
         Map<String, Variant> temp = getDeviceProperties(address);
-        
-        if (temp.containsKey("UUIDs")){
-            List<String> t = (List<String>)temp.get("UUIDs").getValue();
-            for(String k: t)
+
+        if (temp.containsKey("UUIDs")) {
+            List<String> t = (List<String>) temp.get("UUIDs").getValue();
+            for (String k : t)
                 out.add(k);
         }
-        
+
         return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    public void getServices(int connID, String address, BluetoothGattID serviceID)
+            throws RemoteException {
+        if (Status() == false) {
+            if (Start() == false) {
+                throw new RuntimeException("Failed to connect to BlueZ");
+            }
+        }
+
+        ArrayList<String> out = new ArrayList<String>();
+        Map<String, Variant> temp = getDeviceProperties(address);
+
+        if (temp.containsKey("Services")) {
+            List<Path> services = (List<Path>) temp.get("Services").getValue();
+            for (Path p : services) {
+                Service s;
+                try {
+                    s = bus.getRemoteObject(DBUS_BLUEZ, p.toString(), Service.class);
+                    Map<String, Variant> sprop = s.GetProperties();
+                    if (!sprop.containsKey("UUID"))
+                        continue;
+
+                    String s_uuid = sprop.get("UUID").getValue().toString().trim();
+                    Log.d(TAG, "service " + p.toString() + " " + s_uuid);
+
+                    if (s_uuid.length() > 8 && !s_uuid.endsWith("1000-8000-00805f9b34fb"))
+                        continue;
+
+                    Log.d(TAG, "possible match");
+                    BluetoothGattID id;
+                    if (s_uuid.length() <= 8) {
+                        id = BluetoothGattID.getUuuid128FromUuid16(
+                                Integer.valueOf(s_uuid, 16));
+                    } else {
+                        try {
+                            id = new BluetoothGattID(s_uuid);
+                        } catch (IllegalArgumentException e) {
+                            Log.v(TAG, "ignoring");
+                            continue;
+                        }
+                    }
+
+                    if (serviceID == null || serviceID.equals(id)) {
+                        Log.d(TAG, "match!");
+                        listener.serviceDiscovered(connID, address, id.toString(), p.toString());
+                    }
+
+                } catch (DBusException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    listener.serviceDiscoveredFinished(connID, BleConstants.GATT_ERROR);
+                    return;
+                }
+
+            }
+        }
+        listener.serviceDiscoveredFinished(connID, BleConstants.GATT_SUCCESS);
+    }
+
+    @SuppressWarnings("unchecked")
+    public void getCharacteristicsForService(int connID, String address, String serPath)
+            throws RemoteException {
+        if (Status() == false) {
+            if (Start() == false) {
+                throw new RuntimeException("Failed to connect to BlueZ");
+            }
+        }
+
+        String d = findDevice(address);
+        Service s;
+        List<Path> cha = null;
+        List<BluetoothGattID> uuids = null;
+        try {
+            s = bus.getRemoteObject(DBUS_BLUEZ, serPath, Service.class);
+            cha = s.DiscoverCharacteristics();
+            uuids = new ArrayList<BluetoothGattID>();
+            for (Path p : cha) {
+                Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, p.toString(),
+                        Characteristic.class);
+                if (c.GetProperties().containsKey("UUID")) {
+                    Object u = c.GetProperties().get("UUID").getValue();
+                    System.out.println("uuid " + u);
+                    uuids.add(new BluetoothGattID(u.toString()));
+                } else {
+                    Log.e(TAG, "oops no uuid");
+                    uuids.add(null);
+                }
+            }
+        } catch (DBusException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        listener.characteristicsSolved(connID, serPath, cha, uuids);
+    }
+
+    public Object GetCharacteristicValue(String path, String key) {
+        Characteristic c;
+        try {
+            c = bus.getRemoteObject(DBUS_BLUEZ, path,
+                    Characteristic.class);
+            if (!c.GetProperties().containsKey(key))
+                return null;
+            return c.GetProperties().get(key).getValue();
+        } catch (DBusException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return null;
     }
 }

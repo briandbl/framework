@@ -148,4 +148,9 @@ public abstract class BleConstants
     static final String EXTRA_NUM_RESULTS = "NUM_RESULTS";
     static final String GATT_SVC_PKG_NAME = "com.broadcom.bt.app.system";
     static final String GATT_SVC_NAME = "com.broadcom.bt.app.system.GattService";
+    
+    /**
+     * @hide
+     */
+    public static final String BLUETOOTH_LE_SERVICE = "com.manuelnaranjo.btle";
 }
