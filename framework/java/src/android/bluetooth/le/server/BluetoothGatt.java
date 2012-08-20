@@ -152,7 +152,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         IntentReceiver receiver = new IntentReceiver();
         System.out.println("Broadcasting: " + i);
         try {
-            mAm.broadcastIntent(null, i, null, receiver, 0, null, null, null, true, false,
+            mAm.broadcastIntent(null, i, null, null, 0, null, null, null, true, false,
                     0);
         } catch (RemoteException e) {
             e.printStackTrace();

@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.ServiceManager;
 import android.util.Log;
 
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
@@ -20,6 +21,8 @@ import com.broadcom.bt.service.gatt.IBluetoothGatt;
 public class BleAdapter
 {
     private static final String TAG = "BleAdapter";
+    private static final boolean D = true;
+
     private static final int API_LEVEL = 5;
     private static IBluetoothGatt mService;
     private GattServiceConnection mSvcConn;
@@ -82,8 +85,14 @@ public class BleAdapter
      */
     public BleAdapter(Context ctx) {
         this.mContext = ctx;
-        mService = (IBluetoothGatt)ctx.getSystemService("btle");
+        IBinder service = ServiceManager.getService("btle");
+        if (service!=null)
+            mService = IBluetoothGatt.Stub.asInterface(service);
         this.init();
+    }
+
+    public static boolean checkAPIAvailability() {
+        return ServiceManager.getService("btle") != null;
     }
 
     /**
@@ -106,14 +115,14 @@ public class BleAdapter
      */
     public static byte getDeviceType(BluetoothDevice device)
     {
-        if (device != null && mService != null){
+        if (device != null && mService != null) {
             try {
                 return mService.getDeviceType(device.getAddress());
             } catch (RemoteException e) {
                 Log.e(TAG, "error", e);
             }
         }
-        
+
         return 0;
     }
 
@@ -131,11 +140,15 @@ public class BleAdapter
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null)
             return false;
-        /**
-         * TODO: fixme
-         */
+        try {
+            mService.getUUIDs(deviceAddress);
+            return true;
+        } catch (RemoteException e) {
+            e.printStackTrace();
+            if (D)
+                Log.e(TAG, "error", e);
+        }
         return false;
-        // return adapter.getRemoteServices(deviceAddress);
     }
 
     /**
