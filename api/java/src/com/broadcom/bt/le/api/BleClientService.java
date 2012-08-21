@@ -626,10 +626,10 @@ public abstract class BleClientService
         Log.d(TAG, "readNextCharDescriptor address = " + remoteDevice.getAddress());
         Log.d(TAG, "svcId " + svcId);
         Log.d(TAG, "charId " + charId);
-        Log.d(TAG, "descId "  + descriptorId);
+        Log.d(TAG, "descId " + descriptorId);
         if (descriptorId == null)
             descriptorId = charId;
-        
+
         BluetoothGattCharDescrID descId = new BluetoothGattCharDescrID(svcId, charId,
                 descriptorId);
         try
@@ -765,8 +765,8 @@ public abstract class BleClientService
                 {
                     BleClientService.this.readFirstCharacteristic(
                             BleClientService.this.mProfile.getDeviceforConnId(connID),
-                            new BleGattID(s.instanceID, 
-                                    svcId.getUuid(), 
+                            new BleGattID(s.instanceID,
+                                    svcId.getUuid(),
                                     svcId.getServiceType()));
                 }
                 else
@@ -908,9 +908,13 @@ public abstract class BleClientService
                 BluetoothGattID characteristicID)
         {
             Log.d(BleClientService.TAG,
-                    "onGetNextCharacteristic " + characteristicID.toString() + "instance id = "
-                            + characteristicID.getInstanceID() + " status = " + status);
-
+                    "onGetNextCharacteristic status = " + status);
+            if (characteristicID != null)
+                Log.d(BleClientService.TAG, "char: " + characteristicID.toString()
+                        + "instance id = " + characteristicID.getInstanceID());
+            else
+                Log.d(BleClientService.TAG, "no char");
+            
             BluetoothDevice device = BleClientService.this.mProfile
                     .getDeviceforConnId(connID);
             if ((device == null)
@@ -944,11 +948,10 @@ public abstract class BleClientService
 
                 s.characteristics.add(characteristic);
 
-                BleClientService.this.readNextCharDescriptor(
+                BleClientService.this.readFirstCharDescriptor(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         BleApiHelper.gatt2BleID(svcId),
-                        BleApiHelper.gatt2BleID(characteristicID),
-                        null);
+                        BleApiHelper.gatt2BleID(characteristicID));
             }
             else
             {

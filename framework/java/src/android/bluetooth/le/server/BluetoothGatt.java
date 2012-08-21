@@ -17,6 +17,7 @@ import android.util.Log;
 
 import com.broadcom.bt.le.api.BleAdapter;
 import com.broadcom.bt.le.api.BleConstants;
+import com.broadcom.bt.le.api.BleGattID;
 import com.broadcom.bt.le.api.IBleCharacteristicDataCallback;
 import com.broadcom.bt.le.api.IBleClientCallback;
 import com.broadcom.bt.le.api.IBleProfileEventCallback;
@@ -325,9 +326,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         Map<String, List<CharacteristicWrapper>> mCharacteristics = new HashMap<String,
                 List<CharacteristicWrapper>>();
         IBleCharacteristicDataCallback mCallback;
+        BleGattID svcID;
 
         public ServiceWrapper(String address, String uuid, String path) {
             super();
+            this.svcID = new BleGattID(uuid);
             this.mAddress = address;
             this.mUuids.put(uuid, path);
         }
@@ -450,11 +453,19 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public void internalGetFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id)
             throws RemoteException {
         Log.d(TAG, "getFirstChar " + connID + ", " + serviceID + ", " + id);
-        CharacteristicWrapper cw = solveCharacteristics(connID, serviceID).get(0);
+        ServiceWrapper w = getServiceWrapper(connID);
+        List<CharacteristicWrapper> lcw = solveCharacteristics(connID, serviceID);
+        if (lcw.size()==0){
+            if (w.mCallback != null) {
+                w.mCallback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND,
+                        serviceID, null);
+            }
+            return;
+        }
+        CharacteristicWrapper cw = lcw.get(0);
         String c = cw.path;
         Log.d(TAG, "onFirstChar " + c);
 
-        ServiceWrapper w = getServiceWrapper(connID);
         if (w.mCallback != null) {
             w.mCallback.onGetFirstCharacteristic(connID, BleConstants.GATT_SUCCESS,
                     serviceID, cw.gattID);
@@ -491,6 +502,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 }
                 i++;
             }
+            
+            if (i == l.size()){
+                w.mCallback.onGetNextCharacteristic(connID, 
+                        BleConstants.GATT_NOT_FOUND,
+                        charID.getSrvcId(), null);
+                return;
+            }
     
             if (w.mCallback != null) {
                 Log.d(TAG, "sending onGetNextCharacteristic " + connID);
@@ -523,6 +541,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             throws RemoteException {
         System.out.println("getFirstCharDescr " + connID + " " + charID + " " + id);
 
+        // TODO: not implemented yet
+        
+        ServiceWrapper w = getServiceWrapper(connID);
+        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND, 
+                charID.getSrvcId(), charID.getSrvcId(), null);
+        
+        /*
         ServiceWrapper w = getServiceWrapper(connID);
         System.out.println("got ser wrapper");
         CharacteristicWrapper cw = solveCharacteristics(connID, charID.getSrvcId()).get(0);
@@ -541,6 +566,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                     BleConstants.GATT_ERROR, charID.getSrvcId(),
                     charID.getCharId(), null);
         }
+        **/
     }
     
     @Override
