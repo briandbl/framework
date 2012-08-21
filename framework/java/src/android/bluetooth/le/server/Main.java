@@ -3,6 +3,7 @@ package android.bluetooth.le.server;
 
 import android.app.ActivityThread;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Looper;
 import android.os.ServiceManager;
 import android.util.Log;
@@ -34,6 +35,9 @@ class ServerThread extends Thread {
 
             BluetoothGatt s = new BluetoothGatt(c);
             ServiceManager.addService(BluetoothGatt.BLUETOOTH_LE_SERVICE, s);
+            Intent i = new Intent("com.manuelnaranjo.test");
+            i.addCategory("test2");
+            s.broadcastIntent(i);
         } catch (Exception e1) {
             // TODO Auto-generated catch block
             e1.printStackTrace();
