@@ -727,7 +727,7 @@ public abstract class BleClientService
                 return;
             }
 
-            if (status == 0) {
+            if (status == BleConstants.GATT_SUCCESS) {
                 ServiceData s = BleClientService.this.getServiceData(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         svcId.getInstanceID());

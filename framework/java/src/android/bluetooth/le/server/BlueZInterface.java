@@ -25,6 +25,7 @@ import org.freedesktop.dbus.DBusSigHandler;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusException;
+import org.freedesktop.dbus.types.DBusListType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -284,7 +285,9 @@ public class BlueZInterface {
             return null;
 
         try {
-            return d.GetProperties();
+            Map<String, Variant> o = d.GetProperties();
+            System.out.println("device " + o);
+            return o;
         } catch (Error.DoesNotExist e1) {
             Log.e(TAG, "error", e1);
             return null;
@@ -332,6 +335,7 @@ public class BlueZInterface {
                 try {
                     s = bus.getRemoteObject(DBUS_BLUEZ, p.toString(), Service.class);
                     Map<String, Variant> sprop = s.GetProperties();
+                    System.out.println("service " + sprop);
                     if (!sprop.containsKey("UUID"))
                         continue;
 
@@ -392,7 +396,9 @@ public class BlueZInterface {
             for (Path p : cha) {
                 Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, p.toString(),
                         Characteristic.class);
-                if (c.GetProperties().containsKey("UUID")) {
+                Map<String, Variant> prop = c.GetProperties();
+                System.out.println("Char " + prop);
+                if (prop.containsKey("UUID")) {
                     Object u = c.GetProperties().get("UUID").getValue();
                     System.out.println("uuid " + u);
                     uuids.add(new BluetoothGattID(u.toString()));
@@ -414,13 +420,29 @@ public class BlueZInterface {
         try {
             c = bus.getRemoteObject(DBUS_BLUEZ, path,
                     Characteristic.class);
-            if (!c.GetProperties().containsKey(key))
+            Map<String, Variant> p = c.GetProperties();
+            System.out.println("char " + p);
+            if (!p.containsKey(key))
                 return null;
-            return c.GetProperties().get(key).getValue();
+            return p.get(key).getValue();
         } catch (DBusException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
         return null;
+    }
+    
+    public boolean writeCharacteristicValue(String path, byte[] value){
+        try {
+            Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, path,
+                    Characteristic.class);
+            
+            c.SetProperty("Value", new Variant<byte []>(value));
+            return true;
+        } catch (DBusException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return false;
     }
 }

@@ -278,7 +278,8 @@ public abstract class AbstractConnection
      * Timeout in us on checking the BUS for incoming messages and sending
      * outgoing messages
      */
-    protected static final int TIMEOUT = 100000;
+    //protected static final int TIMEOUT = 100000;
+    protected static final int TIMEOUT = 1;
     /** Initial size of the pending calls map */
     private static final int PENDING_MAP_INITIAL_SIZE = 10;
     static final String BUSNAME_REGEX = "^[-_a-zA-Z][-_a-zA-Z0-9]*(\\.[-_a-zA-Z][-_a-zA-Z0-9]*)*$";
