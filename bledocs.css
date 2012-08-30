@@ -1,0 +1,132 @@
+/* -------------------------- Layout ------------------------------------------- */
+
+html, body
+{
+    background-color: #fff;
+}
+
+#overview pre
+{
+    /* these allow lines to break (if there's a white space) */
+    overflow: visible;
+    text-wrap: unrestricted;
+    white-space: -moz-pre-wrap; /* Moz */
+    white-space: -pre-wrap; /* Opera 4-6 */
+    white-space: -o-pre-wrap; /* Opera 7 */
+    white-space: pre-wrap; /* CSS3  */
+    word-wrap: break-word; /* IE 5.5+ */
+    padding: 10px;
+    margin-left: 10px;
+}
+
+#overview ul, #overview li, #overview ol, #overview h1, #overview h2, #overview h3, #overview p
+{
+    margin: 0;
+    padding: 0;
+}
+
+#overview p
+{
+    padding: 0.5em 0;
+}
+
+#overview ul, #overview ol
+{
+    padding: 0 10px 0 2em;
+}
+
+#overview table
+{
+    margin: 1em 0;
+    padding:0;
+    border-collapse:collapse;
+    border-width:0;
+    empty-cells:show;
+}
+
+#overview td, #overview th
+{
+    border: 1px solid #ccc;
+    padding: 6px 12px;
+    text-align: left;
+    vertical-align :top;
+}
+
+#overview h2
+{
+    margin: .75em 0 0 0;
+    padding: 5px 0;
+    border-top: 2px solid #ddd;
+}
+
+#toc-wrapper
+{
+    float: right;
+    width: 280px;
+    padding: 0 0 10px 20px;
+    margin: -30px 0 0 10px;
+}
+
+#toc h2
+{
+    margin: 12px 0 .25em 0;
+    padding: 0 10px;
+    border: 0;
+}
+
+#toc ol, #toc ul
+{
+    list-style: none;
+}
+
+#interaction
+{
+    padding: 10px;
+    text-align: center;
+}
+
+/* -------------------------- Fonts & Colors ----------------------------------- */
+
+a, a:visited, a:hover
+{
+    color: #069;
+}
+
+body, #overview td, #overview th
+{
+    font-family: Helvetica, sans-serif;
+    font-size: 14px;
+}
+
+#overview th
+{
+    background-color: #dee8f1;
+}
+
+#overview pre
+{
+    border: 1px solid #999;
+    background-color: #f9fbff;
+}
+
+#toc-wrapper
+{
+    background-color: #fff;
+}
+
+#toc
+{
+    border: 4px solid #dee8f1;
+    font-size: .9em;
+}
+
+#toc h2
+{
+    font-size: 1.05em;
+    font-weight: bold;
+    color: #444499;
+}
+
+/* -------------------------- Prettify styles ---------------------------------- */
+
+.pln{color:#000}@media screen{.str{color:#080}.kwd{color:#008}.com{color:#800}.typ{color:#606}.lit{color:#066}.pun,.opn,.clo{color:#660}.tag{color:#008}.atn{color:#606}.atv{color:#080}.dec,.var{color:#606}.fun{color:red}}@media print,projection{.str{color:#060}.kwd{color:#006;font-weight:bold}.com{color:#600;font-style:italic}.typ{color:#404;font-weight:bold}.lit{color:#044}.pun,.opn,.clo{color:#440}.tag{color:#006;font-weight:bold}.atn{color:#404}.atv{color:#060}}pre.prettyprint{padding:2px;border:1px solid #888}ol.linenums{margin-top:0;margin-bottom:0}li.L0,li.L1,li.L2,li.L3,li.L5,li.L6,li.L7,li.L8{list-style-type:none}li.L1,li.L3,li.L5,li.L7,li.L9{background:#eee}
