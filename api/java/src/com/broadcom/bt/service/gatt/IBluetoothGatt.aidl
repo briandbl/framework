@@ -12,6 +12,10 @@ import com.broadcom.bt.le.api.IBleProfileEventCallback;
 
 interface IBluetoothGatt {
 
+	int getApiLevel();
+	
+	String getFrameworkVersion();
+
 	byte getDeviceType(in String address);
 
     void getUUIDs(in String address);

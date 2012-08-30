@@ -48,6 +48,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     public static final String BLUETOOTH_PERM = "android.permission.BLUETOOTH";
     public static final String BLUETOOTH_LE_SERVICE = BleConstants.BLUETOOTH_LE_SERVICE;
+    
+    private static int API_LEVEL = 5;
+    private static String FRAMEWORK_VERSION = "0.5.0";
 
     private Map<BluetoothGattID, AppWrapper> registeredApps = new HashMap<BluetoothGattID, AppWrapper>();
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
@@ -774,6 +777,16 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
         w.mCallback.onWriteCharValue(connID, BleConstants.GATT_ERROR,
                 charID.getSrvcId(), charID.getCharId());
+    }
+    
+    @Override
+    public int getApiLevel() throws RemoteException {
+        return API_LEVEL;
+    }
+
+    @Override
+    public String getFrameworkVersion() throws RemoteException {
+        return FRAMEWORK_VERSION;
     }
 
     @Override

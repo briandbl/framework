@@ -101,23 +101,45 @@ public class BleAdapter
         this.init();
     }
 
+    /**
+     * Returns whether the framework com.manuelnaranjo.btle.framework is available
+     * @return
+     */
     public static boolean checkAPIAvailability() {
         return startService();
     }
     
+    /**
+     * Returns the current framework version of the package com.manuelnaranjo.btle.framework
+     * @return
+     */
     public static String getFrameworkVersion()
     {
-        return FRAMEWORK_VERSION;
+        if (!startService())
+            throw new RuntimeException("Failed to connect to service");
+        try {
+            return mService.getFrameworkVersion();
+        } catch (RemoteException e) {
+            throw new RuntimeException("Failed to get API level from service");
+        }
     }
 
     /**
      * Returns the current Open Bluetooth Low Energy SDK API level.
      * 
      * @return
+     * @throws RuntimeException 
      */
     public static int getApiLevel()
     {
-        return API_LEVEL;
+        if (!startService())
+            throw new RuntimeException("Failed to connect to service");
+        
+        try {
+            return mService.getApiLevel();
+        } catch (RemoteException e) {
+            throw new RuntimeException("Failed to get API level from service");
+        }
     }
 
     /**
