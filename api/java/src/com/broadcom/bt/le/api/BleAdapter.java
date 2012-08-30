@@ -23,9 +23,6 @@ public class BleAdapter
     private static final String TAG = "BleAdapter";
     private static final boolean D = true;
 
-    // major, api level, minor
-    private static final String FRAMEWORK_VERSION = "0.5.0";
-    private static final int API_LEVEL = 5;
     private static IBluetoothGatt mService;
     private GattServiceConnection mSvcConn;
     private Context mContext;
