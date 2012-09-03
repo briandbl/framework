@@ -49,8 +49,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public static final String BLUETOOTH_PERM = "android.permission.BLUETOOTH";
     public static final String BLUETOOTH_LE_SERVICE = BleConstants.BLUETOOTH_LE_SERVICE;
     
-    private static int API_LEVEL = 5;
-    private static String FRAMEWORK_VERSION = "0.5.0";
+    public static int API_LEVEL = 5;
+    public static String FRAMEWORK_VERSION = "0.5.1";
 
     private Map<BluetoothGattID, AppWrapper> registeredApps = new HashMap<BluetoothGattID, AppWrapper>();
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
@@ -87,7 +87,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
     };
 
-    public BluetoothGatt(Context ctx) {
+    public BluetoothGatt(Context ctx) throws RemoteException {
         Log.v(TAG, "new bluetoothGatt");
 
         mContext = ctx;
@@ -124,6 +124,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         return BleAdapter.DEVICE_TYPE_BLE;
     }
 
+    @SuppressWarnings("unused")
     private class IntentReceiver extends IIntentReceiver.Stub {
         private boolean mFinished = false;
 
@@ -249,15 +250,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
     }
 
-    private void registerBroadcastReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+    private void registerBroadcastReceiver(BroadcastReceiver receiver, IntentFilter filter) throws RemoteException {
         Log.v(TAG, "registering broadcast receiver");
         IBroadcastReceiver ireceiver = new IBroadcastReceiver(receiver);
-        try {
-            mAm.registerReceiver(null, null, ireceiver, filter, null);
-        } catch (RemoteException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        mAm.registerReceiver(null, null, ireceiver, filter, null);
         Log.v(TAG, "registered");
     }
 
