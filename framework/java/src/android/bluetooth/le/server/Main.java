@@ -8,6 +8,8 @@ import android.os.Looper;
 import android.os.ServiceManager;
 import android.util.Log;
 
+import com.android.internal.os.BinderInternal;
+
 import dalvik.system.VMRuntime;
 
 class ServerThread extends Thread {
@@ -18,16 +20,13 @@ class ServerThread extends Thread {
 
     @Override
     public void run() {
-        /**
-         * Not in use right now.
-         */
         Looper.prepareMainLooper();
 
-        //Process.setThreadPriority(
-        //        Process.THREAD_PRIORITY_FOREGROUND);
+        android.os.Process.setThreadPriority(
+                android.os.Process.THREAD_PRIORITY_FOREGROUND);
 
-        //BinderInternal.disableBackgroundScheduling(true);
-        //Process.setCanSelfBackground(false);
+        BinderInternal.disableBackgroundScheduling(true);
+        android.os.Process.setCanSelfBackground(false);
 
         try {
             ActivityThread at = ActivityThread.systemMain();
@@ -35,20 +34,11 @@ class ServerThread extends Thread {
 
             BluetoothGatt s = new BluetoothGatt(c);
             ServiceManager.addService(BluetoothGatt.BLUETOOTH_LE_SERVICE, s);
-            Intent i = new Intent("com.manuelnaranjo.test");
-            i.addCategory("test2");
-            s.broadcastIntent(i);
-        } catch (Exception e1) {
+        } catch (Exception e) {
             // TODO Auto-generated catch block
-            e1.printStackTrace();
+            Log.e(TAG, "failed to start", e);
+            System.exit(1);
         }
-
-        try {
-            Log.i(TAG, "Started Bluetooth Service");
-        } catch (RuntimeException e) {
-            Log.e(TAG, "failed to start service", e);
-        }
-
         Looper.loop();
     }
 };
