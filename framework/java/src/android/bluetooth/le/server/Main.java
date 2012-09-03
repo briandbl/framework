@@ -58,6 +58,12 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException
     {
+        if (args.length>0 && args[0].equals("--version")){
+            System.out.println("Framework Version: " + BluetoothGatt.FRAMEWORK_VERSION);
+            System.out.println("API Version: " + BluetoothGatt.API_LEVEL);
+            System.exit(0);
+            return;
+        }
         dalvik.system.VMRuntime.getRuntime().clearGrowthLimit();
 
         // The system server has to run all of the time, so it needs to be
