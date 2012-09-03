@@ -92,8 +92,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         mContext = ctx;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (mAdapter == null)
+            throw new RuntimeException("Bluetooth Adapter not ready");
+        
         mAm = ActivityManagerNative.getDefault();
-
+        if (mAm == null)
+            throw new RuntimeException("Activity Manager not ready");
+        
         this.initBroadcast();
         
         mBluezInterface = new BlueZInterface(this, mAdapter);
