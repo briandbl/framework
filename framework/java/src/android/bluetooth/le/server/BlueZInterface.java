@@ -476,6 +476,14 @@ public class BlueZInterface {
         return null;
     }
     
+    public byte[] GetCharacteristicValueValue(String path){
+        Object o = GetCharacteristicValue(path, "Value");
+        Log.v(TAG, "got char value " + o);
+        byte[] d = (byte[]) o;
+        Log.v(TAG, "got char value " + d);
+        return d;
+    }
+    
     class CharacteristicWatcher implements org.bluez.Watcher{
 
         @SuppressWarnings("rawtypes")
@@ -483,23 +491,18 @@ public class BlueZInterface {
         public void ValueChanged(Path characteristic, Map<String, Variant> values) {
             Log.v(TAG, "CharacteristicWatcher.ValueChanged " + characteristic);
             String path = characteristic.toString();
-            Object o = GetCharacteristicValue(path, "Value");
-            Log.v(TAG, "got char value " + o);
 
-            byte[] d = (byte[]) o;
-            Log.v(TAG, "got char value " + d);
-            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), d);
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), 
+                    GetCharacteristicValueValue(path));
         }
 
         @Override
         public void RawValueChanged(Path characteristic, List<Byte> values) {
             Log.v(TAG, "CharacteristicWatcher.RawValueChanged " + characteristic);
             String path = characteristic.toString();
-            Object o = GetCharacteristicValue(path, "Value");
-            Log.v(TAG, "got char value " + o);
-            byte[] d = (byte[]) o;
-            Log.v(TAG, "got char value " + d);
-            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), d);
+
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), 
+                    GetCharacteristicValueValue(path));
         }
 
         @Override
