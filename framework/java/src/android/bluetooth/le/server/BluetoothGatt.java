@@ -824,39 +824,42 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public String getFrameworkVersion() throws RemoteException {
         return FRAMEWORK_VERSION;
     }
-    
-    private Map<Byte, List<String>>mNotificationListener = new HashMap<Byte, List<String>>();
-    
+
+    // maps address to services been watched
+    private Map<String, List<BluetoothGattCharID>> mNotificationListener =
+            new HashMap<String, List<BluetoothGattCharID>>();
+
     @Override
     public boolean registerForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
-        Log.i(TAG, "registering for notifications from " + address + " for uuid " + charID.getCharId());
-        
-        if (!mNotificationListener.containsKey(ifaceID)){
-            Log.v(TAG, "iface not registered for notifications, adding map");
-            mNotificationListener.put(ifaceID, new Vector<String>());
+        Log.i(TAG,
+                "registering for notifications from " + address + " for uuid " + charID.getCharId());
+
+        if (!mNotificationListener.containsKey(address)) {
+            Log.v(TAG, "address not registered for notifications, adding map");
+            mNotificationListener.put(address, new Vector<BluetoothGattCharID>());
         }
-       
+
         Log.v(TAG, "registering new notification receiver");
-        Map<String, String> paths = mBluezInterface.getServicesPathForID(address, 
+        Map<String, String> paths = mBluezInterface.getServicesPathForID(address,
                 charID.getSrvcId());
         Log.v(TAG, "got services");
-        if (paths.size()>1){
+        if (paths.size() > 1) {
             Log.w(TAG, "got more than one path, registering for all of them!");
         }
-        for (Entry<String, String> p: paths.entrySet()){
+        for (Entry<String, String> p : paths.entrySet()) {
             Log.v(TAG, p.getKey() + "->" + p.getValue());
             this.mBluezInterface.registerCharacteristicWatcher(p.getKey());
+            mNotificationListener.get(address).add(charID);
         }
-        mNotificationListener.get(ifaceID).add(address);
+
         Log.v(TAG, "registered new notification listener");
         return true;
     }
-    
+
     @Override
     public boolean deregisterForNotifications(byte interfaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
-        
 
         System.out.println("NI deregForNot\n");
         System.exit(0);
@@ -1137,12 +1140,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public void valueChanged(String charPath, Map<String, Variant> value) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void rawValueChanged(String charPath, List<Byte> value) {
         // TODO Auto-generated method stub
-        
+
     }
 }
