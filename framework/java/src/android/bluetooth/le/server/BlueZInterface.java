@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -338,19 +340,20 @@ public class BlueZInterface {
 
         return out;
     }
-
-    @SuppressWarnings("unchecked")
-    public void getServices(int connID, String address, BluetoothGattID serviceID)
-            throws RemoteException {
+    
+    @SuppressWarnings({
+            "rawtypes", "unchecked"
+    })
+    public Map<String, String> getServicesPathForID(String address, BluetoothGattID serviceID){
         if (Status() == false) {
             if (Start() == false) {
                 throw new RuntimeException("Failed to connect to BlueZ");
             }
         }
-
-        ArrayList<String> out = new ArrayList<String>();
+        
+        Map<String, String> out = new HashMap<String, String>();
         Map<String, Variant> temp = getDeviceProperties(address);
-
+        
         if (temp.containsKey("Services")) {
             List<Path> services = (List<Path>) temp.get("Services").getValue();
             for (Path p : services) {
@@ -358,7 +361,7 @@ public class BlueZInterface {
                 try {
                     s = bus.getRemoteObject(DBUS_BLUEZ, p.toString(), Service.class);
                     Map<String, Variant> sprop = s.GetProperties();
-                    System.out.println("service " + sprop);
+                    Log.d(TAG, "service " + sprop);
                     if (!sprop.containsKey("UUID"))
                         continue;
 
@@ -384,17 +387,36 @@ public class BlueZInterface {
 
                     if (serviceID == null || serviceID.equals(id)) {
                         Log.d(TAG, "match!");
-                        listener.serviceDiscovered(connID, address, id.toString(), p.toString());
+                        out.put(p.toString(), id.toString());
                     }
 
                 } catch (DBusException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                    listener.serviceDiscoveredFinished(connID, BleConstants.GATT_ERROR);
-                    return;
+                    Log.e(TAG, "error while resolving services", e);
+                    return null;
                 }
 
             }
+        }
+        return out;
+    }
+
+    public void getServices(int connID, String address, BluetoothGattID serviceID)
+            throws RemoteException {
+        if (Status() == false) {
+            if (Start() == false) {
+                throw new RuntimeException("Failed to connect to BlueZ");
+            }
+        }
+
+        Map<String, String> paths = getServicesPathForID(address, serviceID);
+        
+        if (paths == null){
+            listener.serviceDiscoveredFinished(connID, BleConstants.GATT_ERROR);
+            return;
+        }
+        
+        for(Entry<String, String> p: paths.entrySet()){
+            listener.serviceDiscovered(connID, address, p.getValue(), p.getKey());
         }
         listener.serviceDiscoveredFinished(connID, BleConstants.GATT_SUCCESS);
     }
