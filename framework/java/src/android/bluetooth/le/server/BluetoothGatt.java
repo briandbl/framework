@@ -861,9 +861,28 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public boolean deregisterForNotifications(byte interfaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
 
-        System.out.println("NI deregForNot\n");
-        System.exit(0);
-        return true;
+        if (!mNotificationListener.containsKey(address)) {
+            Log.e(TAG, "deregisterForNotifications for non registered remote device");
+            return false;
+        }
+
+        Log.i(TAG, "unregistering " + address + " from notifications");
+        Vector<Integer> r = new Vector<Integer>();
+        int i = 0;
+        for (BluetoothGattCharID c : mNotificationListener.get(address)) {
+            if (c.equals(charID)) {
+                Log.v(TAG, "unregistering");
+                r.add(i);
+            }
+            i++;
+        }
+
+        for (Integer I : r) {
+            mNotificationListener.get(address).remove(I);
+        }
+        Log.v(TAG, "removed " + r.size() + " listeners");
+
+        return r.size() > 0;
     }
 
     @Override
@@ -1138,14 +1157,50 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void valueChanged(String charPath, Map<String, Variant> value) {
-        // TODO Auto-generated method stub
+    public void valueChanged(String path, byte[] val) {
 
-    }
+        String[] p = path.split("/");
+        String dev = p[p.length - 2];
+        Log.v(TAG, "device " + dev);
 
-    @Override
-    public void rawValueChanged(String charPath, List<Byte> value) {
-        // TODO Auto-generated method stub
+        BluetoothGattCharID id = null;
 
+        if (!mNotificationListener.containsKey(dev)){
+            Log.v(TAG, "device not registered for notifications");
+            return;
+        }
+        
+        id = mNotificationListener.get(dev).get(0);
+
+        ServiceWrapper w = null;
+        
+        if (!mRemoteServices.containsKey(dev)){
+            Log.v(TAG, "service wrapper not available can't notify");
+            return;
+        }
+        
+        w = mRemoteServices.get(dev);
+
+        int connID = -1;
+        
+        for (Entry<Integer, ConnectionWrapper> conn: mConnectionMap.entrySet()){
+            if (conn.getValue().remote.equals(dev)){
+                connID = conn.getKey();
+                break;
+            }
+        }
+        
+        if (connID == -1) {
+            Log.v(TAG, "failed to resolve connID");
+            return;
+        }
+        
+        Log.v(TAG, "notifing");
+        try {
+            w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS,
+                    id.getSrvcId(), id.getCharId(), val);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed notifiying", e);
+        }
     }
 }
