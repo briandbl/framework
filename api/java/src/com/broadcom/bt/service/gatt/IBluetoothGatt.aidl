@@ -126,11 +126,11 @@ interface IBluetoothGatt {
     void executeWrite(int paramInt, 
                       boolean paramBoolean);
 
-    void registerForNotifications(byte interfaceID, 
+    boolean registerForNotifications(byte interfaceID, 
                                   in String address,
                                   in BluetoothGattCharID charID);
 
-    void deregisterForNotifications(byte interfaceID, 
+    boolean deregisterForNotifications(byte interfaceID, 
                                     in String address,
                                     in BluetoothGattCharID charID);
 
