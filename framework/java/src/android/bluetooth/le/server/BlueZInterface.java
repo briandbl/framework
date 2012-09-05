@@ -52,8 +52,7 @@ public class BlueZInterface {
         public void characteristicsSolved(int connID, String serPath,
                 List<Path> charPath, List<BluetoothGattID> uuids);
         
-        public void valueChanged(String charPath, Map<String, Variant> value);
-        public void rawValueChanged(String charPath, List<Byte> value);
+        public void valueChanged(String charPath, byte[] value);
     }
 
     private static final String DBUS_BLUEZ = "org.bluez";
@@ -483,13 +482,24 @@ public class BlueZInterface {
         @Override
         public void ValueChanged(Path characteristic, Map<String, Variant> values) {
             Log.v(TAG, "CharacteristicWatcher.ValueChanged " + characteristic);
-            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), values);
+            String path = characteristic.toString();
+            Object o = GetCharacteristicValue(path, "Value");
+            Log.v(TAG, "got char value " + o);
+
+            byte[] d = (byte[]) o;
+            Log.v(TAG, "got char value " + d);
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), d);
         }
 
         @Override
         public void RawValueChanged(Path characteristic, List<Byte> values) {
             Log.v(TAG, "CharacteristicWatcher.RawValueChanged " + characteristic);
-            BlueZInterface.this.listener.rawValueChanged(characteristic.getPath(), values);
+            String path = characteristic.toString();
+            Object o = GetCharacteristicValue(path, "Value");
+            Log.v(TAG, "got char value " + o);
+            byte[] d = (byte[]) o;
+            Log.v(TAG, "got char value " + d);
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), d);
         }
 
         @Override
