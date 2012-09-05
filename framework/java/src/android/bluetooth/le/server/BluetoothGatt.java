@@ -1,3 +1,4 @@
+
 package android.bluetooth.le.server;
 
 import android.app.ActivityManagerNative;
@@ -9,6 +10,7 @@ import android.content.Context;
 import android.content.IIntentReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
@@ -39,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
+import java.util.Vector;
 
 public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface.Listener {
     private BlueZInterface mBluezInterface;
@@ -49,7 +52,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     public static final String BLUETOOTH_PERM = "android.permission.BLUETOOTH";
     public static final String BLUETOOTH_LE_SERVICE = BleConstants.BLUETOOTH_LE_SERVICE;
-    
+
     public static int API_LEVEL = 5;
     public static String FRAMEWORK_VERSION = "0.5.2";
 
@@ -95,13 +98,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mAdapter == null)
             throw new RuntimeException("Bluetooth Adapter not ready");
-        
+
         mAm = ActivityManagerNative.getDefault();
         if (mAm == null)
             throw new RuntimeException("Activity Manager not ready");
-        
+
         this.initBroadcast();
-        
+
         mBluezInterface = new BlueZInterface(this, mAdapter);
         mBluezInterface.Start();
 
@@ -177,7 +180,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     private Method mBroadcast;
     private Class<?>[] mBroadcastArgs;
-    
+
     private void initBroadcast() {
         if (mBroadcast != null)
             return;
@@ -189,58 +192,58 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             return;
         }
         Log.i(TAG, "found class");
-        
-        for (Method m: c.getMethods()){
+
+        for (Method m : c.getMethods()) {
             Log.v(TAG, "m " + m.getName());
-            
-            if (m.getName().equals("broadcastIntent")){
+
+            if (m.getName().equals("broadcastIntent")) {
                 mBroadcast = m;
                 mBroadcastArgs = m.getParameterTypes();
                 Log.v(TAG, "found method, argument count " + mBroadcastArgs.length);
-                
-                for (int i = 0; i < mBroadcastArgs.length ; i++){
+
+                for (int i = 0; i < mBroadcastArgs.length; i++) {
                     Log.v(TAG, "argument " + i + " " + mBroadcastArgs[i]);
                 }
                 return;
             }
         }
-        
+
         Log.e(TAG, "couldn't resolve broadcastIntent");
     }
-    
+
     public void broadcastIntent(Intent intent) {
-        
-        if (mBroadcast == null){
+
+        if (mBroadcast == null) {
             Log.v(TAG, "no broadcastIntent, sorry");
             return;
         }
-        
+
         Object[] args = new Object[mBroadcastArgs.length];
-        
+
         boolean flag = true;
-        
-        for (int i = 0; i < args.length ; i++){
-            if (mBroadcastArgs[i].equals(Intent.class)){
+
+        for (int i = 0; i < args.length; i++) {
+            if (mBroadcastArgs[i].equals(Intent.class)) {
                 args[i] = intent;
                 continue;
-            } 
-            
-            if (mBroadcastArgs[i].equals(int.class)){
+            }
+
+            if (mBroadcastArgs[i].equals(int.class)) {
                 args[i] = 0;
                 continue;
             }
-            
+
             if (mBroadcastArgs[i].equals(boolean.class)) {
                 args[i] = flag;
                 if (flag)
                     flag = false;
                 continue;
             }
-            
+
             args[i] = null;
         }
-        
-        try{
+
+        try {
             mBroadcast.invoke(mAm, args);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -251,12 +254,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         } catch (InvocationTargetException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        } catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void registerBroadcastReceiver(BroadcastReceiver receiver, IntentFilter filter) throws RemoteException {
+    private void registerBroadcastReceiver(BroadcastReceiver receiver, IntentFilter filter)
+            throws RemoteException {
         Log.v(TAG, "registering broadcast receiver");
         IBroadcastReceiver ireceiver = new IBroadcastReceiver(receiver);
         mAm.registerReceiver(null, null, ireceiver, filter, null);
@@ -339,19 +343,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 }
             }
         };
-        
+
         if (foreground)
             t.run();
         else
             t.start();
     }
 
+    private boolean pingClient(Binder b) {
+        return b.pingBinder();
+    }
+
     @Override
     public void registerApp(BluetoothGattID appUuid, IBleClientCallback callback)
             throws RemoteException {
-
-        System.out.println("register app " + appUuid + " callback " + callback);
         AppWrapper wrapper = null;
+        System.out.println("register app " + appUuid + " callback " + callback);
         if (registeredApps.containsKey(appUuid)) {
             Log.v(TAG, "uuid all ready registered");
 
@@ -363,17 +370,16 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             Log.v(TAG, "no ping back " + appUuid + " registering again");
         }
 
-        if (wrapper == null){
+        if (wrapper == null) {
             if (mNextAppID == Byte.MAX_VALUE)
                 throw new RemoteException("Can't register more services");
-
             wrapper = new AppWrapper(appUuid, ++mNextAppID, callback);
         }
         this.registeredAppsByID[wrapper.mIfaceID] = wrapper;
         registeredApps.put(appUuid, wrapper);
         callback.onAppRegistered((byte) BleConstants.GATT_SUCCESS, wrapper.mIfaceID);
     }
-    
+
     @Override
     public void unregisterApp(byte interfaceID) throws RemoteException {
         for (Entry<BluetoothGattID, AppWrapper> v : registeredApps.entrySet()) {
@@ -564,7 +570,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     public void internalGetFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id)
             throws RemoteException {
-        System.out.println( "getFirstChar " + connID + ", " + serviceID + ", " + id);
+        System.out.println("getFirstChar " + connID + ", " + serviceID + ", " + id);
         ServiceWrapper w = getServiceWrapper(connID);
         List<CharacteristicWrapper> lcw = solveCharacteristics(connID, serviceID);
         if (lcw.size() == 0) {
@@ -655,32 +661,33 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         // TODO: not implemented yet
 
         ServiceWrapper w = getServiceWrapper(connID);
-        
+
         List<CharacteristicWrapper> lcw = solveCharacteristics(connID, charID.getSrvcId());
-        
-        if (lcw.size() == 0) {       
+
+        if (lcw.size() == 0) {
             System.out.println("no match");
             w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
-                charID.getSrvcId(), charID.getSrvcId(), null);
+                    charID.getSrvcId(), charID.getSrvcId(), null);
             return;
         }
-        
+
         CharacteristicWrapper cw = lcw.get(0);
         Object o = this.mBluezInterface.GetCharacteristicValue(cw.path, "Format");
-        if (o == null){
+        if (o == null) {
             System.out.println("no format");
             w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_ERROR,
-                charID.getSrvcId(), charID.getSrvcId(), null);
+                    charID.getSrvcId(), charID.getSrvcId(), null);
             return;
         }
-        
-        Characteristic.Format fmt = (Characteristic.Format)o;
-        System.out.println("Got format " + fmt.NameSpace + " " + fmt.Description + " " + fmt.Unit + 
+
+        Characteristic.Format fmt = (Characteristic.Format) o;
+        System.out.println("Got format " + fmt.NameSpace + " " + fmt.Description + " " + fmt.Unit +
                 " " + fmt.Format + " " + fmt.Exponent);
-        
-        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_SUCCESS, 
-                charID.getSrvcId(), charID.getSrvcId(), new BluetoothGattID(fmt.Description.intValue()));
-        
+
+        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_SUCCESS,
+                charID.getSrvcId(), charID.getSrvcId(),
+                new BluetoothGattID(fmt.Description.intValue()));
+
         /*
          * ServiceWrapper w = getServiceWrapper(connID);
          * System.out.println("got ser wrapper"); CharacteristicWrapper cw =
@@ -742,13 +749,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
 
     }
-    
+
     @Override
     public void readChar(int connID, BluetoothGattCharID charID, byte authReq)
             throws RemoteException {
 
         System.out.println("readChar\n");
-        
+
         ServiceWrapper w = getServiceWrapper(connID);
         System.out.println("got ser wrapper");
 
@@ -760,10 +767,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 break;
             i++;
         }
-        
-        if (i == lcw.size()){
+
+        if (i == lcw.size()) {
             System.out.println("out of bounds");
-            w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_ERROR, 
+            w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_ERROR,
                     charID.getSrvcId(), charID.getCharId(), null);
             return;
         }
@@ -772,14 +779,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         CharacteristicWrapper cw = lcw.get(i);
         System.out.println("got char wrapper");
-        
+
         Object o = mBluezInterface.GetCharacteristicValue(cw.path, "Value");
         System.out.println("got char value " + o);
-        
+
         byte[] d = (byte[]) o;
         System.out.println("got char value " + d);
-        
-        w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS, 
+
+        w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS,
                 charID.getSrvcId(), charID.getCharId(), d);
     }
 
@@ -796,7 +803,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         for (List<CharacteristicWrapper> lcw : w.mCharacteristics.values()) {
             for (CharacteristicWrapper cw : lcw) {
                 if (cw.gattID.equals(charID.getCharId())) {
-                    if (this.mBluezInterface.writeCharacteristicValue(cw.path, value)){
+                    if (this.mBluezInterface.writeCharacteristicValue(cw.path, value)) {
                         w.mCallback.onWriteCharValue(connID, BleConstants.GATT_SUCCESS,
                                 charID.getSrvcId(), charID.getCharId());
                         return;
@@ -807,7 +814,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         w.mCallback.onWriteCharValue(connID, BleConstants.GATT_ERROR,
                 charID.getSrvcId(), charID.getCharId());
     }
-    
+
     @Override
     public int getApiLevel() throws RemoteException {
         return API_LEVEL;
@@ -816,6 +823,47 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public String getFrameworkVersion() throws RemoteException {
         return FRAMEWORK_VERSION;
+    }
+
+    private Map<Byte, List<String>> mNotificationListener = new HashMap<Byte, List<String>>();
+
+    @Override
+    public boolean registerForNotifications(byte interfaceID, String address,
+            BluetoothGattCharID charID) throws RemoteException {
+
+        if (this.registeredAppsByID[interfaceID] == null) {
+            Log.e(TAG, "Invalid interface id");
+            return false;
+        }
+
+        AppWrapper w = this.registeredAppsByID[interfaceID];
+
+        Log.i(TAG,
+                "registering for notifications from " + address + " for uuid " + charID.getCharId());
+
+        if (mNotificationListener.containsKey(interfaceID)) {
+            Log.v(TAG, "uuid all ready known, just adding this address to the list");
+            mNotificationListener.get((Byte) interfaceID).add(address);
+            return true;
+        }
+
+        Log.v(TAG, "registering new notification receiver");
+        List<String> v = new Vector<String>();
+        v.add(address);
+
+        mNotificationListener.put(interfaceID, v);
+        Log.v(TAG, "registered new notification listener");
+        return true;
+    }
+
+    @Override
+    public boolean deregisterForNotifications(byte interfaceID, String address,
+            BluetoothGattCharID charID) throws RemoteException {
+        // TODO Auto-generated method stub
+
+        System.out.println("NI deregForNot\n");
+        System.exit(0);
+        return true;
     }
 
     @Override
@@ -947,26 +995,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         // TODO Auto-generated method stub
 
         System.out.println("NI execwriter\n");
-        System.exit(0);
-
-    }
-
-    @Override
-    public void registerForNotifications(byte interfaceID, String address,
-            BluetoothGattCharID charID) throws RemoteException {
-        // TODO Auto-generated method stub
-
-        System.out.println("NI registerForNot\n");
-        System.exit(0);
-
-    }
-
-    @Override
-    public void deregisterForNotifications(byte interfaceID, String address,
-            BluetoothGattCharID charID) throws RemoteException {
-        // TODO Auto-generated method stub
-
-        System.out.println("NI deregForNot\n");
         System.exit(0);
 
     }
@@ -1106,6 +1134,18 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public void GATTServer_Close(int paramInt) throws RemoteException {
         // TODO Auto-generated method stub
         System.exit(0);
+
+    }
+
+    @Override
+    public void valueChanged(String charPath, Map<String, Variant> value) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void rawValueChanged(String charPath, List<Byte> value) {
+        // TODO Auto-generated method stub
 
     }
 }
