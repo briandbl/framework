@@ -824,38 +824,37 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public String getFrameworkVersion() throws RemoteException {
         return FRAMEWORK_VERSION;
     }
-
-    private Map<Byte, List<String>> mNotificationListener = new HashMap<Byte, List<String>>();
-
+    
+    private Map<Byte, List<String>>mNotificationListener = new HashMap<Byte, List<String>>();
+    
     @Override
     public boolean registerForNotifications(byte interfaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
-
-        if (this.registeredAppsByID[interfaceID] == null) {
+        
+        if (this.registeredAppsByID[interfaceID] == null){
             Log.e(TAG, "Invalid interface id");
             return false;
         }
-
+        
         AppWrapper w = this.registeredAppsByID[interfaceID];
-
-        Log.i(TAG,
-                "registering for notifications from " + address + " for uuid " + charID.getCharId());
-
-        if (mNotificationListener.containsKey(interfaceID)) {
+        
+        Log.i(TAG, "registering for notifications from " + address + " for uuid " + charID.getCharId());
+        
+        if (mNotificationListener.containsKey(interfaceID)){
             Log.v(TAG, "uuid all ready known, just adding this address to the list");
-            mNotificationListener.get((Byte) interfaceID).add(address);
+            mNotificationListener.get((Byte)interfaceID).add(address);
             return true;
         }
-
+        
         Log.v(TAG, "registering new notification receiver");
         List<String> v = new Vector<String>();
         v.add(address);
-
+        
         mNotificationListener.put(interfaceID, v);
         Log.v(TAG, "registered new notification listener");
         return true;
     }
-
+    
     @Override
     public boolean deregisterForNotifications(byte interfaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
@@ -1140,12 +1139,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public void valueChanged(String charPath, Map<String, Variant> value) {
         // TODO Auto-generated method stub
-
+        
     }
 
     @Override
     public void rawValueChanged(String charPath, List<Byte> value) {
         // TODO Auto-generated method stub
-
+        
     }
 }
