@@ -780,14 +780,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         CharacteristicWrapper cw = lcw.get(i);
         System.out.println("got char wrapper");
 
-        Object o = mBluezInterface.GetCharacteristicValue(cw.path, "Value");
-        System.out.println("got char value " + o);
-
-        byte[] d = (byte[]) o;
-        System.out.println("got char value " + d);
-
         w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS,
-                charID.getSrvcId(), charID.getCharId(), d);
+                charID.getSrvcId(), charID.getCharId(),
+                mBluezInterface.GetCharacteristicValueValue(cw.path));
     }
 
     @Override
