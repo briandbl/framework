@@ -828,21 +828,21 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     private Map<Byte, List<String>>mNotificationListener = new HashMap<Byte, List<String>>();
     
     @Override
-    public boolean registerForNotifications(byte interfaceID, String address,
+    public boolean registerForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
         
-        if (this.registeredAppsByID[interfaceID] == null){
+        if (this.registeredAppsByID[ifaceID] == null){
             Log.e(TAG, "Invalid interface id");
             return false;
         }
         
-        AppWrapper w = this.registeredAppsByID[interfaceID];
+        AppWrapper w = this.registeredAppsByID[ifaceID];
         
         Log.i(TAG, "registering for notifications from " + address + " for uuid " + charID.getCharId());
         
-        if (mNotificationListener.containsKey(interfaceID)){
+        if (mNotificationListener.containsKey(ifaceID)){
             Log.v(TAG, "uuid all ready known, just adding this address to the list");
-            mNotificationListener.get((Byte)interfaceID).add(address);
+            mNotificationListener.get((Byte)ifaceID).add(address);
             return true;
         }
         
@@ -850,7 +850,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         List<String> v = new Vector<String>();
         v.add(address);
         
-        mNotificationListener.put(interfaceID, v);
+        mNotificationListener.put(ifaceID, v);
         Log.v(TAG, "registered new notification listener");
         return true;
     }
