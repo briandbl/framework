@@ -1,12 +1,12 @@
 package org.bluez;
 
+import org.freedesktop.DBus.Method;
 import org.freedesktop.dbus.DBusInterface;
-import org.freedesktop.dbus.DBusSignal;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
-import org.freedesktop.dbus.exceptions.DBusException;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 
@@ -17,20 +17,12 @@ import java.util.List;
  */
 public interface Watcher extends DBusInterface{
 
-    /**
-     * New raw value of the Characteristic Value attribute
-     */
-    public class ValueChanged extends DBusSignal {
-        Path characteristic;
-        List<Byte> value;
-           
-        public ValueChanged(String path, Path c, List<Byte>v) 
-                throws DBusException{
-            super(path, c, v);
-            this.characteristic = c;
-            this.value = v;
-        }
-    }
+    @Method.NoReply()
+    @SuppressWarnings("rawtypes")
+    void ValueChanged(Path characteristic,  Map<String, Variant> values);
     
-    public static String PATH="android.bluetooth.le.watcher";
+    @Method.NoReply()
+    void RawValueChanged(Path characteristic, List<Byte> values);
+    
+    public static String PATH="com.manuelnaranjo.le.watcher";
 }
