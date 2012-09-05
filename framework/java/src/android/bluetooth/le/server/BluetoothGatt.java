@@ -830,27 +830,25 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public boolean registerForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
-        
-        if (this.registeredAppsByID[ifaceID] == null){
-            Log.e(TAG, "Invalid interface id");
-            return false;
-        }
-        
-        AppWrapper w = this.registeredAppsByID[ifaceID];
-        
         Log.i(TAG, "registering for notifications from " + address + " for uuid " + charID.getCharId());
         
-        if (mNotificationListener.containsKey(ifaceID)){
-            Log.v(TAG, "uuid all ready known, just adding this address to the list");
-            mNotificationListener.get((Byte)ifaceID).add(address);
-            return true;
+        if (!mNotificationListener.containsKey(ifaceID)){
+            Log.v(TAG, "iface not registered for notifications, adding map");
+            mNotificationListener.put(ifaceID, new Vector<String>());
         }
-        
+       
         Log.v(TAG, "registering new notification receiver");
-        List<String> v = new Vector<String>();
-        v.add(address);
-        
-        mNotificationListener.put(ifaceID, v);
+        Map<String, String> paths = mBluezInterface.getServicesPathForID(address, 
+                charID.getSrvcId());
+        Log.v(TAG, "got services");
+        if (paths.size()>1){
+            Log.w(TAG, "got more than one path, registering for all of them!");
+        }
+        for (Entry<String, String> p: paths.entrySet()){
+            Log.v(TAG, p.getKey() + "->" + p.getValue());
+            this.mBluezInterface.registerCharacteristicWatcher(p.getKey());
+        }
+        mNotificationListener.get(ifaceID).add(address);
         Log.v(TAG, "registered new notification listener");
         return true;
     }
@@ -858,7 +856,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public boolean deregisterForNotifications(byte interfaceID, String address,
             BluetoothGattCharID charID) throws RemoteException {
-        // TODO Auto-generated method stub
+        
 
         System.out.println("NI deregForNot\n");
         System.exit(0);
