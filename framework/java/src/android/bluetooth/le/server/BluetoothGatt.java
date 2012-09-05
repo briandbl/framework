@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface.Listener {
@@ -350,16 +351,43 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             throws RemoteException {
 
         System.out.println("register app " + appUuid + " callback " + callback);
-        if (registeredApps.containsKey(appUuid))
-            throw new RemoteException("uuid all ready registered");
+        AppWrapper wrapper = null;
+        if (registeredApps.containsKey(appUuid)) {
+            Log.v(TAG, "uuid all ready registered");
 
-        if (mNextAppID == Byte.MAX_VALUE)
-            throw new RemoteException("Can't register more services");
+            wrapper = registeredApps.get(appUuid);
+            if (wrapper.mCallback.asBinder().pingBinder()) {
+                Log.e(TAG, "uuid is registered and alive");
+                throw new RemoteException("uuid registed and alive");
+            }
+            Log.v(TAG, "no ping back " + appUuid + " registering again");
+        }
 
-        AppWrapper wrapper = new AppWrapper(appUuid, ++mNextAppID, callback);
+        if (wrapper == null){
+            if (mNextAppID == Byte.MAX_VALUE)
+                throw new RemoteException("Can't register more services");
+
+            wrapper = new AppWrapper(appUuid, ++mNextAppID, callback);
+        }
         this.registeredAppsByID[wrapper.mIfaceID] = wrapper;
         registeredApps.put(appUuid, wrapper);
         callback.onAppRegistered((byte) BleConstants.GATT_SUCCESS, wrapper.mIfaceID);
+    }
+    
+    @Override
+    public void unregisterApp(byte interfaceID) throws RemoteException {
+        for (Entry<BluetoothGattID, AppWrapper> v : registeredApps.entrySet()) {
+            if (v.getValue().mIfaceID == interfaceID) {
+                if (v.getValue().mCallback.asBinder().pingBinder())
+                    v.getValue().mCallback.onAppDeregistered(interfaceID);
+                registeredApps.remove(v.getKey());
+                Log.v(TAG, "app successfully unregistered for interface: " + interfaceID +
+                        ", uuid: " + v.getValue().mGattID);
+                return;
+            }
+        }
+        Log.e(TAG, "interfaceID not known " + interfaceID);
+        return;
     }
 
     @Override
@@ -788,13 +816,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public String getFrameworkVersion() throws RemoteException {
         return FRAMEWORK_VERSION;
-    }
-
-    @Override
-    public void unregisterApp(byte interfaceID) throws RemoteException {
-        // TODO Auto-generated method stub
-        System.out.println("NI unregisterapp\n");
-        System.exit(0);
     }
 
     @Override
