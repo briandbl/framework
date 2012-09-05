@@ -18,6 +18,7 @@ import org.bluez.Device;
 import org.bluez.Error;
 import org.bluez.Manager;
 import org.bluez.Service;
+import org.bluez.Watcher;
 import org.freedesktop.DBus;
 import org.freedesktop.DBus.NameOwnerChanged;
 import org.freedesktop.dbus.DBusConnection;
@@ -25,13 +26,13 @@ import org.freedesktop.dbus.DBusSigHandler;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusException;
-import org.freedesktop.dbus.types.DBusListType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 
 /**
  * @author manuel
@@ -48,6 +49,9 @@ public class BlueZInterface {
 
         public void characteristicsSolved(int connID, String serPath,
                 List<Path> charPath, List<BluetoothGattID> uuids);
+        
+        public void valueChanged(String charPath, Map<String, Variant> value);
+        public void rawValueChanged(String charPath, List<Byte> value);
     }
 
     private static final String DBUS_BLUEZ = "org.bluez";
@@ -57,6 +61,8 @@ public class BlueZInterface {
     private Manager manager = null;
     private Adapter adapter = null;
     private Listener listener = null;
+    private CharacteristicWatcher mWatcher = null;
+    private List<String> mWatchedServices = null;
 
     private BluetoothAdapter mAndroidBluetoothAdapter;
 
@@ -84,11 +90,28 @@ public class BlueZInterface {
     @SuppressWarnings({
             "rawtypes", "unchecked"
     })
-    private synchronized void disconnectDBus() {
+    private synchronized void disconnectDBus() {        
         adapter = null;
         manager = null;
+
         if (bus == null)
             return;
+
+        // there's no way we will not have a bus but a watcher
+        if (mWatcher != null){
+            for (String p : mWatchedServices){
+                try {
+                    Service s;
+                    s = bus.getRemoteObject(DBUS_BLUEZ, p, Service.class);
+                    s.UnregisterCharacteristicsWatcher(new Path(Watcher.PATH));
+                } catch (Exception e){
+                    Log.e(TAG, "failure while unregistering watcher", e);
+                }
+            }
+            mWatchedServices = null;
+            bus.unExportObject(Watcher.PATH);
+            mWatcher = null;
+        }
 
         Iterator<Map.Entry<Class, DBusSigHandler>> it =
                 listeners.entrySet().iterator();
@@ -432,6 +455,28 @@ public class BlueZInterface {
         return null;
     }
     
+    class CharacteristicWatcher implements org.bluez.Watcher{
+
+        @SuppressWarnings("rawtypes")
+        @Override
+        public void ValueChanged(Path characteristic, Map<String, Variant> values) {
+            Log.v(TAG, "CharacteristicWatcher.ValueChanged " + characteristic);
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), values);
+        }
+
+        @Override
+        public void RawValueChanged(Path characteristic, List<Byte> values) {
+            Log.v(TAG, "CharacteristicWatcher.RawValueChanged " + characteristic);
+            BlueZInterface.this.listener.rawValueChanged(characteristic.getPath(), values);
+        }
+
+        @Override
+        public boolean isRemote() {
+            return false;
+        }
+        
+    }
+    
     public boolean writeCharacteristicValue(String path, byte[] value){
         try {
             Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, path,
@@ -441,8 +486,51 @@ public class BlueZInterface {
             return true;
         } catch (DBusException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            Log.e(TAG, "error while writting characteristic", e);
         }
         return false;
     }
+    
+    public enum REGISTER_RET_VALUES {
+        ERROR,
+        ALL_READY_REGISTERED,
+        REGISTERED
+    };
+    
+    public REGISTER_RET_VALUES registerCharacteristicWatcher(String serPath) {
+        if (Status() == false) {
+            if (Start() == false) {
+                return REGISTER_RET_VALUES.ERROR;
+            }
+        }
+    
+        if (mWatcher == null){
+            Log.v(TAG, "Exporting characteristic watcher");
+            mWatcher = new CharacteristicWatcher();
+            try {
+                bus.exportObject(Watcher.PATH, mWatcher);
+            } catch (DBusException e) {
+                Log.e(TAG, "Failed to export watcher", e);
+                return REGISTER_RET_VALUES.ERROR;
+            }
+            Log.v(TAG, "Exported");
+            
+            mWatchedServices = new Vector<String>();
+        }
+        
+        if (mWatchedServices.contains(serPath))
+            return REGISTER_RET_VALUES.ALL_READY_REGISTERED;
+        Service s = null;
+        
+        try {
+            s = bus.getRemoteObject(DBUS_BLUEZ, serPath, Service.class);
+        } catch (Exception e){
+            Log.e(TAG, "failed getting service object", e);
+            return REGISTER_RET_VALUES.ERROR;
+        }
+        s.RegisterCharacteristicsWatcher(new Path(Watcher.PATH));
+        mWatchedServices.add(serPath);
+        return REGISTER_RET_VALUES.REGISTERED;
+    }
+    
 }
