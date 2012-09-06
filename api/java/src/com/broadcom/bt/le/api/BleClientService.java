@@ -701,7 +701,9 @@ public abstract class BleClientService
     {
         Log.d(TAG, "onServiceRefreshed");
         onRefreshComplete(mProfile.getDeviceforConnId(connID));
+        Log.d(TAG, "onRefreshComplete done");
         mProfile.onServiceRefreshed(this, mProfile.getDeviceforConnId(connID));
+        Log.d(TAG, "onServiceRefreshed complete");
     }
 
     class BleCharacteristicDataCallback extends IBleCharacteristicDataCallback.Stub
@@ -915,10 +917,9 @@ public abstract class BleClientService
             else
                 Log.d(BleClientService.TAG, "no char");
             
-            BluetoothDevice device = BleClientService.this.mProfile
-                    .getDeviceforConnId(connID);
+            BluetoothDevice device = mProfile.getDeviceforConnId(connID);
             if ((device == null)
-                    || (BleClientService.this.mProfile.isDeviceDisconnecting(device))) {
+                    || (mProfile.isDeviceDisconnecting(device))) {
                 Log.e(BleClientService.TAG,
                         "onGetNextCharacteristic() - Device is disconnecting...");
                 return;
@@ -955,10 +956,12 @@ public abstract class BleClientService
             }
             else
             {
-                ServiceData s = BleClientService.this.getNextServiceData(
-                        BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        svcId.getInstanceID());
 
+                Log.v(TAG, "status != SUCCESS, service data");
+                ServiceData s = BleClientService.this.getNextServiceData(
+                        mProfile.getDeviceforConnId(connID),
+                        svcId.getInstanceID());
+                Log.v(TAG, "value " + s);
                 if (null != s)
                 {
                     BleClientService.this.readFirstCharacteristic(
@@ -969,7 +972,7 @@ public abstract class BleClientService
                 }
                 else
                 {
-                    BleClientService.this.onServiceRefreshed(connID);
+                    onServiceRefreshed(connID);
                 }
             }
         }
