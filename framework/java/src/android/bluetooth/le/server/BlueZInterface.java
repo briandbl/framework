@@ -57,7 +57,7 @@ public class BlueZInterface {
 
     private static final String DBUS_BLUEZ = "org.bluez";
 
-    static String TAG = "BluetoothLEService";
+    static String TAG = "BlueZInterface";
     private DBusConnection bus = null;
     private Manager manager = null;
     private Adapter adapter = null;
