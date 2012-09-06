@@ -715,32 +715,29 @@ public abstract class BleClientProfile
 
         public void onSearchCompleted(int connID, int status) {
             Log.d(TAG, "BleClientCallback::onSearchCompleted ("
-                    + BleClientProfile.this.mAppUuid + ") connID = " + connID + "status = "
+                    + mAppUuid + ") connID = " + connID + " status = "
                     + status);
 
             int nServicesFound = 0;
 
-            if (BleClientProfile.this.mRequiredServices == null) {
+            if (mRequiredServices == null) {
                 Log.d(TAG, "mRequiredServices is null");
                 return;
             }
 
-            if (BleClientProfile.this.mPeerServices == null) {
+            if (mPeerServices == null) {
                 Log.d(TAG, "mPeerServices is null");
                 return;
             }
 
-            for (int i = 0; i < BleClientProfile.this.mRequiredServices.size(); i++) {
-                for (int j = 0; j < BleClientProfile.this.mPeerServices.size(); j++) {
-                    if (((BleGattID) BleClientProfile.this.mPeerServices.get(j))
-                            .toString().equalsIgnoreCase(
-                                    BleClientProfile.this.mRequiredServices
-                                            .get(i).getServiceId().toString())) {
-                        BleClientProfile.this.mRequiredServices.get(i)
-                                .setInstanceID(
-                                        BleClientProfile.this.mClientIDToDeviceMap.get(new Integer(
-                                                connID)),
-                                        BleClientProfile.this.mPeerServices.get(j).getInstanceID());
+            for (int i = 0; i < mRequiredServices.size(); i++) {
+                for (int j = 0; j < mPeerServices.size(); j++) {
+                    Log.v(TAG, "comparing " + mRequiredServices.get(i).getServiceId());
+                    Log.v(TAG, "with " + mPeerServices.get(j));
+                    if (mPeerServices.get(j).equals(mRequiredServices.get(i).getServiceId())) {
+                        mRequiredServices.get(i).setInstanceID(
+                                mClientIDToDeviceMap.get(connID),
+                                mPeerServices.get(j).getInstanceID());
                         nServicesFound++;
                         break;
                     }
@@ -748,28 +745,23 @@ public abstract class BleClientProfile
             }
 
             Log.d(TAG, "BleClientCallback::onSearchResult - found "
-                    + nServicesFound + " out of " + BleClientProfile.this.mRequiredServices.size()
+                    + nServicesFound + " out of " + mRequiredServices.size()
                     + " services needed for this profile");
-            BluetoothDevice device = (BluetoothDevice) BleClientProfile.this.mClientIDToDeviceMap
-                    .get(new Integer(connID));
+            BluetoothDevice device = mClientIDToDeviceMap.get(connID);
 
             if (device == null) {
                 Log.d(TAG,
                         "No bluetooth device in the device map for connid = " + connID);
             }
-            else if (BleClientProfile.this.isDeviceDisconnecting(device)) {
+            else if (isDeviceDisconnecting(device)) {
                 Log.d(TAG, "Device disconnecting...");
             }
-            else if (nServicesFound == BleClientProfile.this.mRequiredServices.size()) {
-                Log.d(TAG,
-                        "the num of Srvs found match the required srv size ");
-                BleClientProfile.this.onDeviceConnected(device);
+            else if (nServicesFound == mRequiredServices.size()) {
+                Log.d(TAG, "the num of Srvs found match the required srv size ");
+                onDeviceConnected(device);
             } else {
-                Log.d(TAG,
-                        "the num of Srvs found DOES NOT match the required srv size ");
+                Log.d(TAG, "the num of Srvs found DOES NOT match the required srv size ");
             }
         }
-
     }
-
 }
