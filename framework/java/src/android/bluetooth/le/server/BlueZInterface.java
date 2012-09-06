@@ -310,7 +310,7 @@ public class BlueZInterface {
 
         try {
             Map<String, Variant> o = d.GetProperties();
-            System.out.println("device " + o);
+            Log.v(TAG, "device " + o);
             return o;
         } catch (Error.DoesNotExist e1) {
             Log.e(TAG, "error", e1);
@@ -441,10 +441,10 @@ public class BlueZInterface {
                 Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, p.toString(),
                         Characteristic.class);
                 Map<String, Variant> prop = c.GetProperties();
-                System.out.println("Char " + prop);
+                Log.v(TAG, "Char " + prop);
                 if (prop.containsKey("UUID")) {
                     Object u = c.GetProperties().get("UUID").getValue();
-                    System.out.println("uuid " + u);
+                    Log.v(TAG, "uuid " + u);
                     uuids.add(new BluetoothGattID(u.toString()));
                 } else {
                     Log.e(TAG, "oops no uuid");
@@ -453,7 +453,7 @@ public class BlueZInterface {
             }
         } catch (DBusException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            Log.e(TAG, "error while resolving uuids", e);
         }
 
         listener.characteristicsSolved(connID, serPath, cha, uuids);
@@ -465,13 +465,13 @@ public class BlueZInterface {
             c = bus.getRemoteObject(DBUS_BLUEZ, path,
                     Characteristic.class);
             Map<String, Variant> p = c.GetProperties();
-            System.out.println("char " + p);
+            Log.v(TAG, "get char value char " + p);
             if (!p.containsKey(key))
                 return null;
             return p.get(key).getValue();
         } catch (DBusException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            Log.e(TAG, "error on getCharacteristicValue", e);
         }
         return null;
     }
