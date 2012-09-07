@@ -528,15 +528,15 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         return conn;
     }
 
+    private ServiceWrapper getServiceWrapper(String remote) throws RemoteException {
+        if (!mRemoteServices.containsKey(remote))
+            throw new RemoteException("Address not in cache");
+        return mRemoteServices.get(remote);
+    }
+
     private ServiceWrapper getServiceWrapper(int connID) throws RemoteException {
         ConnectionWrapper conn = getConnectionWrapper(connID);
-        String address = conn.remote;
-
-        if (!mRemoteServices.containsKey(address)) {
-            throw new RemoteException("Address not in cache");
-        }
-
-        return mRemoteServices.get(address);
+        return getServiceWrapper(conn.remote);
 
     }
 
@@ -624,8 +624,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 Log.v(TAG, "" + connID + ", " + charID);
                 if (w.mCallback != null)
                     w.mCallback.onGetNextCharacteristic(connID,
-                        BleConstants.GATT_NOT_FOUND,
-                        charID.getSrvcId(), null);
+                            BleConstants.GATT_NOT_FOUND,
+                            charID.getSrvcId(), null);
                 else
                     Log.e(TAG, "mCallback is null!");
                 return;
@@ -692,14 +692,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 new BluetoothGattID(fmt.Description.intValue()));
 
         /*
-         * ServiceWrapper w = getServiceWrapper(connID);
-         * Log.v(TAG, "got ser wrapper"); CharacteristicWrapper cw =
-         * solveCharacteristics(connID, charID.getSrvcId()).get(0);
-         * Log.v(TAG, "got char wrapper"); Object o =
-         * mBluezInterface.GetCharacteristicValue(cw.path, "Format");
-         * Log.v(TAG, "got char value " + o); if (o != null) {
-         * Characteristic.Format fmt = (Characteristic.Format) o;
-         * Log.v(TAG, "getFirstCharDescr " + fmt.Description);
+         * ServiceWrapper w = getServiceWrapper(connID); Log.v(TAG,
+         * "got ser wrapper"); CharacteristicWrapper cw =
+         * solveCharacteristics(connID, charID.getSrvcId()).get(0); Log.v(TAG,
+         * "got char wrapper"); Object o =
+         * mBluezInterface.GetCharacteristicValue(cw.path, "Format"); Log.v(TAG,
+         * "got char value " + o); if (o != null) { Characteristic.Format fmt =
+         * (Characteristic.Format) o; Log.v(TAG, "getFirstCharDescr " +
+         * fmt.Description);
          * w.mCallback.onGetFirstCharacteristicDescriptor(connID,
          * BleConstants.GATT_SUCCESS, charID.getSrvcId(), charID.getCharId(),
          * new BluetoothGattID(fmt.Description.intValue())); } else { Log.v(TAG,
@@ -839,21 +839,24 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
 
         Log.v(TAG, "registering new notification receiver");
-        Map<String, String> paths = mBluezInterface.getServicesPathForID(address,
-                charID.getCharId());;
         
-        Log.v(TAG, "got services");
-        if (paths.size() > 1) {
-            Log.w(TAG, "got more than one path, registering for all of them!");
-        } else if (paths.size() == 0){
-            Log.w(TAG, "no paths to register");
-        }
-        for (Entry<String, String> p : paths.entrySet()) {
-            Log.v(TAG, p.getKey() + "->" + p.getValue());
-            this.mBluezInterface.registerCharacteristicWatcher(p.getKey());
-            mNotificationListener.get(address).add(charID);
+        ServiceWrapper ser = getServiceWrapper(address);
+
+        if (!ser.mUuids.containsKey(charID.getSrvcId().toString())) {
+            throw new RuntimeException("invalid service id");
         }
 
+        String service = ser.mUuids.get(charID.getSrvcId().toString());
+        
+        Map<BluetoothGattID, String> ids = mBluezInterface.getCharacteristicsForService(service);
+        
+        for (Entry<BluetoothGattID, String> e: ids.entrySet()){
+           Log.v(TAG, e.getValue() + " -> " + e.getKey());
+           mBluezInterface.registerCharacteristicWatcher(e.getValue());
+           mNotificationListener.get(address).add(charID);
+           Log.v(TAG, "registered");
+        }
+        
         Log.v(TAG, "registered new notification listener");
         return true;
     }
@@ -1166,36 +1169,36 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         BluetoothGattCharID id = null;
 
-        if (!mNotificationListener.containsKey(dev)){
+        if (!mNotificationListener.containsKey(dev)) {
             Log.v(TAG, "device not registered for notifications");
             return;
         }
-        
+
         id = mNotificationListener.get(dev).get(0);
 
         ServiceWrapper w = null;
-        
-        if (!mRemoteServices.containsKey(dev)){
+
+        if (!mRemoteServices.containsKey(dev)) {
             Log.v(TAG, "service wrapper not available can't notify");
             return;
         }
-        
+
         w = mRemoteServices.get(dev);
 
         int connID = -1;
-        
-        for (Entry<Integer, ConnectionWrapper> conn: mConnectionMap.entrySet()){
-            if (conn.getValue().remote.equals(dev)){
+
+        for (Entry<Integer, ConnectionWrapper> conn : mConnectionMap.entrySet()) {
+            if (conn.getValue().remote.equals(dev)) {
                 connID = conn.getKey();
                 break;
             }
         }
-        
+
         if (connID == -1) {
             Log.v(TAG, "failed to resolve connID");
             return;
         }
-        
+
         Log.v(TAG, "notifing");
         try {
             w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS,

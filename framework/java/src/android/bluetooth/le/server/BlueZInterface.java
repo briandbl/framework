@@ -557,7 +557,9 @@ public class BlueZInterface {
         REGISTERED
     };
 
-    public REGISTER_RET_VALUES registerCharacteristicWatcher(String serPath) {
+    public REGISTER_RET_VALUES registerCharacteristicWatcher(String charPath) {
+        
+        
         if (Status() == false) {
             if (Start() == false) {
                 return REGISTER_RET_VALUES.ERROR;
@@ -577,7 +579,13 @@ public class BlueZInterface {
 
             mWatchedServices = new Vector<String>();
         }
-
+        
+        String[] p = charPath.split("/");
+        String serPath = "";
+        for (int i=1; i<p.length-1; i++){
+            serPath+="/"+p[i];
+        }
+        
         if (mWatchedServices.contains(serPath))
             return REGISTER_RET_VALUES.ALL_READY_REGISTERED;
         Service s = null;
