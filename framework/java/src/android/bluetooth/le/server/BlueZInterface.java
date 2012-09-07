@@ -51,7 +51,7 @@ public class BlueZInterface {
 
         public void characteristicsSolved(int connID, String serPath,
                 List<Path> charPath, List<BluetoothGattID> uuids);
-        
+
         public void valueChanged(String charPath, byte[] value);
     }
 
@@ -91,7 +91,7 @@ public class BlueZInterface {
     @SuppressWarnings({
             "rawtypes", "unchecked"
     })
-    private synchronized void disconnectDBus() {        
+    private synchronized void disconnectDBus() {
         adapter = null;
         manager = null;
 
@@ -99,13 +99,13 @@ public class BlueZInterface {
             return;
 
         // there's no way we will not have a bus but a watcher
-        if (mWatcher != null){
-            for (String p : mWatchedServices){
+        if (mWatcher != null) {
+            for (String p : mWatchedServices) {
                 try {
                     Service s;
                     s = bus.getRemoteObject(DBUS_BLUEZ, p, Service.class);
                     s.UnregisterCharacteristicsWatcher(new Path(Watcher.PATH));
-                } catch (Exception e){
+                } catch (Exception e) {
                     Log.e(TAG, "failure while unregistering watcher", e);
                 }
             }
@@ -339,20 +339,20 @@ public class BlueZInterface {
 
         return out;
     }
-    
+
     @SuppressWarnings({
             "rawtypes", "unchecked"
     })
-    public Map<String, String> getServicesPathForID(String address, BluetoothGattID serviceID){
+    public Map<String, String> getServicesPathForID(String address, BluetoothGattID serviceID) {
         if (Status() == false) {
             if (Start() == false) {
                 throw new RuntimeException("Failed to connect to BlueZ");
             }
         }
-        
+
         Map<String, String> out = new HashMap<String, String>();
         Map<String, Variant> temp = getDeviceProperties(address);
-        
+
         if (temp.containsKey("Services")) {
             List<Path> services = (List<Path>) temp.get("Services").getValue();
             for (Path p : services) {
@@ -361,29 +361,40 @@ public class BlueZInterface {
                     s = bus.getRemoteObject(DBUS_BLUEZ, p.toString(), Service.class);
                     Map<String, Variant> sprop = s.GetProperties();
                     Log.d(TAG, "service " + sprop);
-                    if (!sprop.containsKey("UUID"))
+                    if (!sprop.containsKey("UUID")) {
+                        Log.d(TAG, "no uuid, can't compare");
                         continue;
+                    }
 
                     String s_uuid = sprop.get("UUID").getValue().toString().trim();
                     Log.d(TAG, "service " + p.toString() + " " + s_uuid);
 
-                    if (s_uuid.length() > 8 && !s_uuid.endsWith("1000-8000-00805f9b34fb"))
+                    if (s_uuid.length() > 8 && !s_uuid.endsWith("1000-8000-00805f9b34fb")) {
+                        Log.e(TAG, "128b UUID with wrong ending");
                         continue;
+                    }
 
                     Log.d(TAG, "possible match");
                     BluetoothGattID id;
                     if (s_uuid.length() <= 8) {
                         id = BluetoothGattID.getUuuid128FromUuid16(
                                 Integer.valueOf(s_uuid, 16));
+                        Log.d(TAG, "16b uuid: " + id);
                     } else {
                         try {
                             id = new BluetoothGattID(s_uuid);
+                            Log.d(TAG, "128b uuid: " + id);
                         } catch (IllegalArgumentException e) {
-                            Log.v(TAG, "ignoring");
+                            Log.e(TAG, "error parsing 128b uuid", e);
                             continue;
                         }
                     }
 
+                    if (serviceID == null)
+                        Log.v(TAG, "serviceID is null, I will match anyhing");
+
+                    Log.v(TAG, "compairing " + serviceID);
+                    Log.v(TAG, "with " + id);
                     if (serviceID == null || serviceID.equals(id)) {
                         Log.d(TAG, "match!");
                         out.put(p.toString(), id.toString());
@@ -408,54 +419,68 @@ public class BlueZInterface {
         }
 
         Map<String, String> paths = getServicesPathForID(address, serviceID);
-        
-        if (paths == null){
+
+        if (paths == null) {
             listener.serviceDiscoveredFinished(connID, BleConstants.GATT_ERROR);
             return;
         }
-        
-        for(Entry<String, String> p: paths.entrySet()){
+
+        for (Entry<String, String> p : paths.entrySet()) {
             listener.serviceDiscovered(connID, address, p.getValue(), p.getKey());
         }
         listener.serviceDiscoveredFinished(connID, BleConstants.GATT_SUCCESS);
     }
 
-    @SuppressWarnings("unchecked")
-    public void getCharacteristicsForService(int connID, String address, String serPath)
-            throws RemoteException {
+    @SuppressWarnings("rawtypes")
+    public Map<BluetoothGattID, String> getCharacteristicsForService(String serPath){
         if (Status() == false) {
             if (Start() == false) {
                 throw new RuntimeException("Failed to connect to BlueZ");
             }
         }
-
-        String d = findDevice(address);
+        
+        Map<BluetoothGattID, String> out = new HashMap<BluetoothGattID, String>();
         Service s;
         List<Path> cha = null;
-        List<BluetoothGattID> uuids = null;
+        
         try {
             s = bus.getRemoteObject(DBUS_BLUEZ, serPath, Service.class);
             cha = s.DiscoverCharacteristics();
-            uuids = new ArrayList<BluetoothGattID>();
             for (Path p : cha) {
                 Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, p.toString(),
                         Characteristic.class);
                 Map<String, Variant> prop = c.GetProperties();
                 Log.v(TAG, "Char " + prop);
+                BluetoothGattID id = null;
                 if (prop.containsKey("UUID")) {
                     Object u = c.GetProperties().get("UUID").getValue();
                     Log.v(TAG, "uuid " + u);
-                    uuids.add(new BluetoothGattID(u.toString()));
+                    id = new BluetoothGattID(u.toString());
                 } else {
                     Log.e(TAG, "oops no uuid");
-                    uuids.add(null);
                 }
+                out.put(id, p.toString());
             }
         } catch (DBusException e) {
-            // TODO Auto-generated catch block
             Log.e(TAG, "error while resolving uuids", e);
         }
 
+        
+        return out;
+    }
+    
+    public void getCharacteristicsForService(int connID, String address, String serPath)
+            throws RemoteException {
+
+        Map<BluetoothGattID, String> m = this.getCharacteristicsForService(serPath);
+        List<Path> cha = new Vector<Path>();
+        List<BluetoothGattID> uuids = new Vector<BluetoothGattID>();
+        
+        for (Entry<BluetoothGattID, String> e: m.entrySet()){
+            cha.add(new Path(e.getValue()));
+            uuids.add(e.getKey());
+        }
+        
         listener.characteristicsSolved(connID, serPath, cha, uuids);
     }
 
@@ -475,16 +500,16 @@ public class BlueZInterface {
         }
         return null;
     }
-    
-    public byte[] GetCharacteristicValueValue(String path){
+
+    public byte[] GetCharacteristicValueValue(String path) {
         Object o = GetCharacteristicValue(path, "Value");
         Log.v(TAG, "got char value " + o);
         byte[] d = (byte[]) o;
         Log.v(TAG, "got char value " + d);
         return d;
     }
-    
-    class CharacteristicWatcher implements org.bluez.Watcher{
+
+    class CharacteristicWatcher implements org.bluez.Watcher {
 
         @SuppressWarnings("rawtypes")
         @Override
@@ -492,7 +517,7 @@ public class BlueZInterface {
             Log.v(TAG, "CharacteristicWatcher.ValueChanged " + characteristic);
             String path = characteristic.toString();
 
-            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), 
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(),
                     GetCharacteristicValueValue(path));
         }
 
@@ -501,7 +526,7 @@ public class BlueZInterface {
             Log.v(TAG, "CharacteristicWatcher.RawValueChanged " + characteristic);
             String path = characteristic.toString();
 
-            BlueZInterface.this.listener.valueChanged(characteristic.getPath(), 
+            BlueZInterface.this.listener.valueChanged(characteristic.getPath(),
                     GetCharacteristicValueValue(path));
         }
 
@@ -509,15 +534,15 @@ public class BlueZInterface {
         public boolean isRemote() {
             return false;
         }
-        
+
     }
-    
-    public boolean writeCharacteristicValue(String path, byte[] value){
+
+    public boolean writeCharacteristicValue(String path, byte[] value) {
         try {
             Characteristic c = bus.getRemoteObject(DBUS_BLUEZ, path,
                     Characteristic.class);
-            
-            c.SetProperty("Value", new Variant<byte []>(value));
+
+            c.SetProperty("Value", new Variant<byte[]>(value));
             return true;
         } catch (DBusException e) {
             // TODO Auto-generated catch block
@@ -525,21 +550,21 @@ public class BlueZInterface {
         }
         return false;
     }
-    
+
     public enum REGISTER_RET_VALUES {
         ERROR,
         ALL_READY_REGISTERED,
         REGISTERED
     };
-    
+
     public REGISTER_RET_VALUES registerCharacteristicWatcher(String serPath) {
         if (Status() == false) {
             if (Start() == false) {
                 return REGISTER_RET_VALUES.ERROR;
             }
         }
-    
-        if (mWatcher == null){
+
+        if (mWatcher == null) {
             Log.v(TAG, "Exporting characteristic watcher");
             mWatcher = new CharacteristicWatcher();
             try {
@@ -549,17 +574,17 @@ public class BlueZInterface {
                 return REGISTER_RET_VALUES.ERROR;
             }
             Log.v(TAG, "Exported");
-            
+
             mWatchedServices = new Vector<String>();
         }
-        
+
         if (mWatchedServices.contains(serPath))
             return REGISTER_RET_VALUES.ALL_READY_REGISTERED;
         Service s = null;
-        
+
         try {
             s = bus.getRemoteObject(DBUS_BLUEZ, serPath, Service.class);
-        } catch (Exception e){
+        } catch (Exception e) {
             Log.e(TAG, "failed getting service object", e);
             return REGISTER_RET_VALUES.ERROR;
         }
@@ -567,5 +592,5 @@ public class BlueZInterface {
         mWatchedServices.add(serPath);
         return REGISTER_RET_VALUES.REGISTERED;
     }
-    
+
 }
