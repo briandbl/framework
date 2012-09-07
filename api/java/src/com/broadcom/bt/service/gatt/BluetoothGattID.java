@@ -3,6 +3,7 @@ package com.broadcom.bt.service.gatt;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.util.Log;
 
 import com.broadcom.bt.le.api.BleConstants;
 
@@ -204,31 +205,39 @@ public class BluetoothGattID
 
     public boolean equals(Object target)
     {
+        Log.v(TAG, "comparing " + this + " with " + target);
+        
         if (target == null) {
             return false;
         }
 
         if (this == target) {
+            Log.v(TAG, "same object");
             return true;
         }
         if (!(target instanceof BluetoothGattID)) {
+            Log.v(TAG, "wrong instance");
             return false;
         }
 
         BluetoothGattID targetId = (BluetoothGattID) target;
         if (this.mType != targetId.getUuidType()) {
-            return false;
+            Log.v(TAG, "different types!, comparing String level");
+            return this.toString().toLowerCase().equals(targetId.toString().toLowerCase());
         }
         if (this.mServiceType != targetId.getServiceType()) {
+            Log.v(TAG, "different service types");
             return false;
         }
         if ((this.mType == BleConstants.GATT_UUID_TYPE_128)
                 && (targetId.getInstanceID() == this.mInstId)
                 && (this.mUuid128.equals(targetId.getUuid())))
         {
+            Log.v(TAG, "128b equals");
             return true;
         }
 
+        Log.v(TAG, "comparing 16b");
         return (this.mType == BleConstants.GATT_UUID_TYPE_16)
                 && (targetId.getInstanceID() == this.mInstId)
                 && (this.mUuid16 == targetId.getUuid16());
