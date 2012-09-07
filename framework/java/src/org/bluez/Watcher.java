@@ -24,5 +24,5 @@ public interface Watcher extends DBusInterface{
     @Method.NoReply()
     void RawValueChanged(Path characteristic, List<Byte> values);
     
-    public static String PATH="com.manuelnaranjo.le.watcher";
+    public static String PATH="/com/manuelnaranjo/le/watcher";
 }
