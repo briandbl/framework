@@ -681,7 +681,7 @@ public abstract class BleClientProfile
             BleClientProfile.this.mPeerServices.clear();
             try
             {
-                BleClientProfile.this.mService.searchService(connID, null);
+                BleClientProfile.this.mService.searchService(connID, mAppUuid);
             } catch (RemoteException e) {
                 Log.d(TAG, "Error calling searchService " + e.toString());
             }
