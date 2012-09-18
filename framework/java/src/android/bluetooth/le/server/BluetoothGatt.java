@@ -339,22 +339,28 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void open(byte interfaceID, final String remote, boolean foreground) {
-        // TODO Auto-generated method stub
         Log.v(TAG, "open " + interfaceID + " " + remote);
 
         final AppWrapper w = this.registeredAppsByID[interfaceID];
         if (mNextConnID == Integer.MAX_VALUE) {
-            throw new RemoteException("Out of connection IDs");
+            Log.e(TAG, "failed to connect to: " + remote + ", out of connection IDs");
+            try {
+                w.mCallback.onConnected(remote, -1);
+            } catch (RemoteException e) {
+                Log.e(TAG, "we failed to notify other end", e);
+            }
+            return;
         }
+        
         Thread t = new Thread() {
             public void run() {
                 try {
                     int conn = ++mNextConnID;
+                    w.mCallback.onConnected(remote, conn);
                     mConnectionMap.put(new Integer(conn), new ConnectionWrapper(
                             conn, w, remote));
-                    w.mCallback.onConnected(remote, conn);
                 } catch (RemoteException e) {
-                    Log.e(TAG, "WTF", e);
+                    Log.e(TAG, "error during connection", e);
                 }
             }
         };
