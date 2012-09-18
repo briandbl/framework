@@ -440,19 +440,18 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void setEncryption(String address, byte action) {
-        // TODO Auto-generated method stub
         Log.v(TAG, "setEncryption " + address + " " + action);
         this.mAdapter.getRemoteDevice(address).createBond();
     }
 
     @Override
     public void searchService(final int connID, final BluetoothGattID serviceID) {
-        // TODO Auto-generated method stub
         Log.v(TAG, "searchService " + connID + " " + serviceID);
 
         final Integer id = new Integer(connID);
         if (!mConnectionMap.containsKey(id)) {
-            throw new RemoteException("Invalid connection id");
+            Log.e(TAG, "id not known on search service");
+            return;
         }
 
         new Thread() {
@@ -461,8 +460,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 try {
                     mBluezInterface.getServices(connID, address, serviceID);
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
-                    Log.e(TAG, "error", e);
+                    Log.e(TAG, "getServices error", e);
                 }
             }
         }.start();
@@ -498,7 +496,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void serviceDiscovered(int connID, String address, String uuid, String path) {
-        // TODO Auto-generated method stub
         if (mRemoteServices.get(address) != null) {
             mRemoteServices.get(address).mUuids.put(uuid, path);
         } else {
@@ -515,8 +512,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             AppWrapper w = getConnectionWrapper(connID).wrapper;
             w.mCallback.onSearchResult(connID, new BluetoothGattID(uuid));
         } catch (RemoteException e) {
-            // TODO Auto-generated catch block
-            Log.e(TAG, "error", e);
+            Log.e(TAG, "error when sending back search results", e);
         }
     }
 
