@@ -654,20 +654,22 @@ public abstract class BleClientProfile
             BluetoothDevice d = BleClientProfile.this
                     .findDeviceWaitingForConnection(deviceAddress);
 
-            if (null == d)
-            {
-                d = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
-                synchronized (BleClientProfile.this.mConnectedDevices) {
-                    BleClientProfile.this.mConnectedDevices.add(d);
-                }
+            if (d == null){
+                Log.v(TAG, "Got connected signal from device that wasn't on the waiting list");
+                return;
+            }
 
-                synchronized (BleClientProfile.this.mConnectingDevices) {
-                    BleClientProfile.this.mConnectingDevices.remove(d);
-                }
+            d = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress);
+            synchronized (BleClientProfile.this.mConnectedDevices) {
+                BleClientProfile.this.mConnectedDevices.add(d);
+            }
 
-                synchronized (BleClientProfile.this.mDisconnectingDevices) {
-                    BleClientProfile.this.mDisconnectingDevices.remove(d);
-                }
+            synchronized (BleClientProfile.this.mConnectingDevices) {
+                BleClientProfile.this.mConnectingDevices.remove(d);
+            }
+
+            synchronized (BleClientProfile.this.mDisconnectingDevices) {
+                BleClientProfile.this.mDisconnectingDevices.remove(d);
             }
 
             if (d.getBondState() == BluetoothDevice.BOND_BONDED) {
