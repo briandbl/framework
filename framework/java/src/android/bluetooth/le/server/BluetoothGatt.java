@@ -918,11 +918,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     private Map<String, List<BluetoothGattCharID>> mNotificationListener =
             new HashMap<String, List<BluetoothGattCharID>>();
 
-    @Override
-    public boolean registerForNotifications(byte ifaceID, String address,
-            BluetoothGattCharID charID) {
-        Log.i(TAG,
-                "registering for notifications from " + address + " for uuid " + charID.getCharId());
+    private int internalRegisterForNotifications(ServiceWrapper ser, byte ifaceID, 
+            String address, BluetoothGattCharID charID){
 
         if (!mNotificationListener.containsKey(address)) {
             Log.v(TAG, "address not registered for notifications, adding map");
@@ -931,25 +928,57 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         Log.v(TAG, "registering new notification receiver");
 
-        ServiceWrapper ser = getServiceWrapper(address);
-
         if (!ser.mUuids.containsKey(charID.getSrvcId().toString())) {
-            throw new RuntimeException("invalid service id");
-        }
+            return BleConstants.GATT_ERROR;
+        } 
 
         String service = ser.mUuids.get(charID.getSrvcId().toString());
 
-        Map<BluetoothGattID, String> ids = mBluezInterface.getCharacteristicsForService(service);
-
+        Map<BluetoothGattID, String> ids = null;
+        
+        try {
+            ids = mBluezInterface.getCharacteristicsForService(service);
+        } catch (Exception e) {
+            Log.e(TAG, "failed to get ids", e);
+            return BleConstants.GATT_ERROR;
+        }
+            
         for (Entry<BluetoothGattID, String> e : ids.entrySet()) {
             Log.v(TAG, e.getValue() + " -> " + e.getKey());
-            mBluezInterface.registerCharacteristicWatcher(e.getValue());
+            try {
+                mBluezInterface.registerCharacteristicWatcher(e.getValue());
+            } catch (BlueZConnectionError e1) {
+                Log.e(TAG, "failed to get watcher registered", e1);
+                continue;
+            }
             mNotificationListener.get(address).add(charID);
             Log.v(TAG, "registered");
         }
 
         Log.v(TAG, "registered new notification listener");
-        return true;
+        
+        return BleConstants.GATT_SUCCESS;
+    }
+    
+    @Override
+    public boolean registerForNotifications(byte ifaceID, String address,
+            BluetoothGattCharID charID) {
+        Log.i(TAG,
+                "registering for notifications from " + address + " for uuid " + charID.getCharId());
+
+        ServiceWrapper ser = getServiceWrapper(address);
+        if (ser == null || ser.mCallback == null)
+            return false;
+        
+        int ret = internalRegisterForNotifications(ser, ifaceID, address, charID);
+        
+        try {
+            ser.mCallback.onRegForNotifications(-1, ret, charID.getSrvcId(), charID.getCharId());
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed during onRegForNotifications ret: " + ret);
+        }
+        
+        return ret == BleConstants.GATT_SUCCESS;
     }
 
     @Override
