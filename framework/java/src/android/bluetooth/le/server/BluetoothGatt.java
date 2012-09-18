@@ -523,8 +523,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             if (w.mCallback != null)
                 w.mCallback.onSearchCompleted(connID, status);
         } catch (RemoteException e) {
-            // TODO Auto-generated catch block
-            Log.e(TAG, "error", e);
+            Log.e(TAG, "error on serviceDiscoveredFinished", e);
         }
     }
 
@@ -532,14 +531,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public void characteristicsSolved(int connID, String serPath, List<Path> chars,
             List<BluetoothGattID> uuids) {
         String remote;
-        try {
-            remote = getConnectionWrapper(connID).remote;
-        } catch (RemoteException e) {
-            // TODO Auto-generated catch block
-            Log.e(TAG, "error", e);
+        ConnectionWrapper w = getConnectionWrapper(connID);
+        if (w == null) {
+            Log.e(TAG, "no connection wrapper can't do a thing");
             return;
         }
-
+        
+        remote = w.remote;
+        
         if (mRemoteServices.get(remote) == null) {
             Log.e(TAG, "device is no longer in cache, WTF");
             return;
@@ -558,7 +557,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     private ConnectionWrapper getConnectionWrapper(int connID) {
         if (!mConnectionMap.containsKey(new Integer(connID))) {
-            throw new RemoteException("invalid device");
+            return null;
         }
 
         ConnectionWrapper conn = mConnectionMap.get(new Integer(connID));
@@ -567,7 +566,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     private ServiceWrapper getServiceWrapper(String remote) {
         if (!mRemoteServices.containsKey(remote))
-            throw new RemoteException("Address not in cache");
+            return null;
         return mRemoteServices.get(remote);
     }
 
