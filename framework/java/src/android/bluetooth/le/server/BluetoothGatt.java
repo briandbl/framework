@@ -582,13 +582,19 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         ServiceWrapper ser = getServiceWrapper(connID);
 
         if (!ser.mUuids.containsKey(serviceID.toString())) {
-            throw new RuntimeException("invalid service id");
+            Log.e(TAG, "uuid not known");
+            return null;
         }
 
         String service = ser.mUuids.get(serviceID.toString());
 
         if (!ser.mCharacteristics.containsKey(service)) {
-            mBluezInterface.getCharacteristicsForService(connID, conn.remote, service);
+            try {
+                mBluezInterface.getCharacteristicsForService(connID, conn.remote, service);
+            } catch (Exception e) {
+                Log.e(TAG, "failed getting characteristics", e);
+                return null;
+            }
             Log.v(TAG, "got characteristics");
         }
 
@@ -607,31 +613,33 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         Log.v(TAG, "getFirstChar " + connID + ", " + serviceID + ", " + id);
         ServiceWrapper w = getServiceWrapper(connID);
         List<CharacteristicWrapper> lcw = solveCharacteristics(connID, serviceID);
-        if (lcw.size() == 0) {
-            if (w.mCallback != null) {
-                w.mCallback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND,
-                        serviceID, null);
-            }
-            return;
+        
+        int ret = BleConstants.GATT_SUCCESS;
+        BluetoothGattID out = null;
+        if (lcw == null || lcw.size() == 0){
+            ret = BleConstants.GATT_NOT_FOUND;
+        } else {        
+            CharacteristicWrapper cw = lcw.get(0);
+            String c = cw.path;
+            Log.v(TAG, "onFirstChar " + c + " " + serviceID + " " + cw.gattID);
+            out = cw.gattID;
         }
-        CharacteristicWrapper cw = lcw.get(0);
-        String c = cw.path;
-        Log.v(TAG, "onFirstChar " + c + " " + serviceID + " " + cw.gattID);
-
+        
         if (w.mCallback != null) {
-            w.mCallback.onGetFirstCharacteristic(connID, BleConstants.GATT_SUCCESS,
-                    serviceID, cw.gattID);
+            try {
+                w.mCallback.onGetFirstCharacteristic(connID, ret, serviceID, out);
+            } catch (RemoteException e) {
+                Log.e(TAG, "failed to tell other end status " + ret + " id: " + out);
+            }
+        } else {
+            Log.e(TAG, "no callback known, can't call onGetFirstCharacteristic");
         }
     }
 
     @Override
     public void getFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id)
     {
-        try {
-            internalGetFirstChar(connID, serviceID, id);
-        } catch (Exception e) {
-            Log.e(TAG, "error", e);
-        }
+        internalGetFirstChar(connID, serviceID, id);
     }
 
     @Override
