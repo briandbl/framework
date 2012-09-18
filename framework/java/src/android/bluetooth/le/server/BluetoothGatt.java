@@ -74,7 +74,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException e) {
-                                // TODO Auto-generated catch block
                                 Log.e(TAG, "error", e);
                             }
                             BluetoothGatt.this.mBluezInterface.Start(true);
@@ -105,7 +104,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         this.initBroadcast();
 
-        mBluezInterface = new BlueZInterface(this, mAdapter);
+        mBluezInterface = new BlueZInterface(this);
         mBluezInterface.Start();
 
         registerBroadcastReceiver(mReceiver,
@@ -601,48 +600,50 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void getNextChar(int connID, BluetoothGattCharID charID, BluetoothGattID id)
+    public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id)
             throws RemoteException {
         // TODO Auto-generated method stub
         Log.v(TAG, "getNextChar");
         try {
-            Log.v(TAG, "getNextChar " + connID + ", " + charID + ", " + id);
+            Log.v(TAG, "getNextChar " + connID + ", " + svcID + ", " + id);
 
             ServiceWrapper w = getServiceWrapper(connID);
             int i = 0;
-            BluetoothGattID gattID = charID.getCharId();
-            List<CharacteristicWrapper> l = solveCharacteristics(connID, charID.getSrvcId());
+            BluetoothGattID charID = svcID.getCharId();
+            List<CharacteristicWrapper> l = solveCharacteristics(connID, svcID.getSrvcId());
             for (CharacteristicWrapper cw : l) {
-                if (gattID.equals(cw.gattID)) {
+                if (charID.equals(cw.gattID)) {
                     break;
                 }
                 i++;
             }
-            Log.v(TAG, "char i: " + i + " out of " + l.size());
-
-            if (i == l.size()) {
-                Log.v(TAG, "" + connID + ", " + charID);
-                if (w.mCallback != null)
-                    w.mCallback.onGetNextCharacteristic(connID,
-                            BleConstants.GATT_NOT_FOUND,
-                            charID.getSrvcId(), null);
-                else
-                    Log.e(TAG, "mCallback is null!");
+            Log.v(TAG, "char i: " + (i+1) + " out of " + l.size());
+            
+            if (w.mCallback==null){
+                Log.e(TAG, "callback is null can't reply with onGetNextCharacteristic");
                 return;
             }
 
-            if (w.mCallback != null) {
-                Log.v(TAG, "sending onGetNextCharacteristic " + connID);
-                int status = i < l.size() - 1 ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
-                Log.d(TAG, "status " + status);
-                if (charID != null)
-                    Log.d(TAG, "srvcId " + charID.getSrvcId());
-                Log.d(TAG, "gattID" + l.get(i).gattID);
-
+            if (i == l.size() - 1) {
+                Log.v(TAG, "" + connID + ", " + charID);
                 w.mCallback.onGetNextCharacteristic(connID,
-                        status,
-                        charID.getSrvcId(), l.get(i).gattID);
+                            BleConstants.GATT_NOT_FOUND,
+                            svcID.getSrvcId(), null);
+                return;
             }
+
+            Log.v(TAG, "sending onGetNextCharacteristic " + connID);
+            i++;
+            int status = i < l.size() ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
+            Log.d(TAG, "status " + status);
+            Log.d(TAG, "srvcId " + svcID.getSrvcId());
+            BluetoothGattID gid = null;
+            if (status == BleConstants.GATT_SUCCESS)
+                gid = l.get(i).gattID;
+            Log.d(TAG, "gattID " + gid );
+
+            w.mCallback.onGetNextCharacteristic(connID, status,
+                        svcID.getSrvcId(), gid);
         } catch (Exception e) {
             Log.e(TAG, "error", e);
         }
@@ -659,9 +660,16 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public void getFirstCharDescr(int connID, BluetoothGattCharID charID, BluetoothGattID id)
             throws RemoteException {
-        Log.v(TAG, "getFirstCharDescr " + connID + " " + charID + " " + id);
 
-        // TODO: not implemented yet
+        // BlueZ doesn't support this over DBUS yet, so it makes no sense to do any processing here.
+        ServiceWrapper w = getServiceWrapper(connID);
+        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
+                charID.getSrvcId(), charID.getSrvcId(),
+                null);
+
+        
+        /*
+        Log.v(TAG, "getFirstCharDescr " + connID + " " + charID + " " + id);
 
         ServiceWrapper w = getServiceWrapper(connID);
 
@@ -670,7 +678,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         if (lcw.size() == 0) {
             Log.v(TAG, "no match");
             w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
-                    charID.getSrvcId(), charID.getSrvcId(), null);
+                    charID.getSrvcId(), charID.getCharId(), null);
             return;
         }
 
@@ -679,7 +687,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         if (o == null) {
             Log.v(TAG, "no format");
             w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_ERROR,
-                    charID.getSrvcId(), charID.getSrvcId(), null);
+                    charID.getSrvcId(), charID.getCharId(), null);
             return;
         }
 
@@ -690,24 +698,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_SUCCESS,
                 charID.getSrvcId(), charID.getSrvcId(),
                 new BluetoothGattID(fmt.Description.intValue()));
-
-        /*
-         * ServiceWrapper w = getServiceWrapper(connID); Log.v(TAG,
-         * "got ser wrapper"); CharacteristicWrapper cw =
-         * solveCharacteristics(connID, charID.getSrvcId()).get(0); Log.v(TAG,
-         * "got char wrapper"); Object o =
-         * mBluezInterface.GetCharacteristicValue(cw.path, "Format"); Log.v(TAG,
-         * "got char value " + o); if (o != null) { Characteristic.Format fmt =
-         * (Characteristic.Format) o; Log.v(TAG, "getFirstCharDescr " +
-         * fmt.Description);
-         * w.mCallback.onGetFirstCharacteristicDescriptor(connID,
-         * BleConstants.GATT_SUCCESS, charID.getSrvcId(), charID.getCharId(),
-         * new BluetoothGattID(fmt.Description.intValue())); } else { Log.v(TAG,
-         * "getFirstCharDescr no format ");
-         * w.mCallback.onGetFirstCharacteristicDescriptor(connID,
-         * BleConstants.GATT_ERROR, charID.getSrvcId(), charID.getCharId(),
-         * null); }
-         */
+                */
     }
 
     @Override
@@ -718,6 +709,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         ServiceWrapper w = getServiceWrapper(connID);
         Log.v(TAG, "got ser wrapper");
 
+        // BlueZ doesn't support this over DBUS yet, so it makes no sense to do any processing here.
+        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
+                charDescrID.getSrvcId(), charDescrID.getSrvcId(),
+                null);
+
+        /*
         List<CharacteristicWrapper> lcw = solveCharacteristics(connID, charDescrID.getSrvcId());
 
         int i = 0;
@@ -732,7 +729,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         CharacteristicWrapper cw = lcw.get(i);
         Log.v(TAG, "got char wrapper");
         Object o = mBluezInterface.GetCharacteristicValue(cw.path, "Format");
-        Log.v(TAG, "got char value " + o);
+        Log.v(TAG, " " + o);
         int status = i <= lcw.size() - 1 ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
         if (o != null) {
             Characteristic.Format fmt = (Characteristic.Format) o;
@@ -750,7 +747,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                     charDescrID.getCharId(),
                     null);
         }
-
+         */
     }
 
     @Override
@@ -792,23 +789,33 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public void writeCharValue(int connID, BluetoothGattCharID charID, int writeType, byte authReq,
             byte[] value) throws RemoteException {
         // TODO Auto-generated method stub
-        Log.v(TAG, "writeCharValue");
+        Log.v(TAG, "writeCharValue for " + charID);
         ServiceWrapper w = getServiceWrapper(connID);
-        if (!w.svcID.equals(charID.getSrvcId())) {
+        Log.v(TAG, "wrapper from " + w.svcID);
+        if (!charID.getSrvcId().equals((BluetoothGattID)w.svcID)) {
             Log.v(TAG, "oops svcid is different\n");
+            Log.v(TAG, "compared " + w.svcID + " with " + charID.getSrvcId());
+            w.mCallback.onWriteCharValue(connID, BleConstants.GATT_ERROR,
+                    charID.getSrvcId(), charID.getCharId());
+            return;
         }
 
         for (List<CharacteristicWrapper> lcw : w.mCharacteristics.values()) {
             for (CharacteristicWrapper cw : lcw) {
+                Log.v(TAG, "trying with char " + cw.gattID);
                 if (cw.gattID.equals(charID.getCharId())) {
+                    Log.v(TAG, "writting on path " + cw.path);
                     if (this.mBluezInterface.writeCharacteristicValue(cw.path, value)) {
+                        Log.v(TAG, "success");
                         w.mCallback.onWriteCharValue(connID, BleConstants.GATT_SUCCESS,
                                 charID.getSrvcId(), charID.getCharId());
                         return;
                     }
+                    Log.v(TAG, "failed");
                 }
             }
         }
+        Log.v(TAG, "write failed");
         w.mCallback.onWriteCharValue(connID, BleConstants.GATT_ERROR,
                 charID.getSrvcId(), charID.getCharId());
     }
