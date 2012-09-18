@@ -32,7 +32,7 @@ class ServerThread extends Thread {
             ActivityThread at = ActivityThread.systemMain();
             Context c = at.getSystemContext();
 
-            BluetoothGatt s = new BluetoothGatt(c);
+            BluetoothGatt s = new BluetoothGatt();
             ServiceManager.addService(BluetoothGatt.BLUETOOTH_LE_SERVICE, s);
         } catch (Exception e) {
             // TODO Auto-generated catch block

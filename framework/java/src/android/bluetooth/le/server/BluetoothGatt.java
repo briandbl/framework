@@ -33,7 +33,6 @@ import com.broadcom.bt.service.gatt.IBluetoothGatt;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.UInt32;
 import org.freedesktop.dbus.Variant;
-import org.freedesktop.dbus.exceptions.DBusException;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -47,7 +46,6 @@ import java.util.Vector;
 
 public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface.Listener {
     private BlueZInterface mBluezInterface;
-    private Context mContext;
     private BluetoothAdapter mAdapter;
     private IActivityManager mAm;
     private static String TAG = "BT-GATT";
@@ -92,10 +90,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
     };
 
-    public BluetoothGatt(Context ctx) {
+    public BluetoothGatt() {
         Log.v(TAG, "new bluetoothGatt");
 
-        mContext = ctx;
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         if (mAdapter == null)
             throw new RuntimeException("Bluetooth Adapter not ready");
@@ -356,9 +353,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             public void run() {
                 try {
                     int conn = ++mNextConnID;
-                    w.mCallback.onConnected(remote, conn);
                     mConnectionMap.put(new Integer(conn), new ConnectionWrapper(
                             conn, w, remote));
+                    w.mCallback.onConnected(remote, conn);
                 } catch (RemoteException e) {
                     Log.e(TAG, "error during connection", e);
                 }
@@ -450,7 +447,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         final Integer id = new Integer(connID);
         if (!mConnectionMap.containsKey(id)) {
-            Log.e(TAG, "id not known on search service");
+            Log.e(TAG, "connection id not known on search service");
             return;
         }
 
@@ -824,6 +821,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         if (cw != null) {
             try {
                 value = mBluezInterface.GetCharacteristicValueValue(cw.path);
+                Log.v(TAG, "got read value " + value);
             } catch (Exception e) {
                 Log.e(TAG, "failed getting characteristic value", e);
             }
@@ -833,7 +831,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void readChar(int connID, BluetoothGattCharID svcID, byte authReq) {
-        Log.v(TAG, "readChar");
+        Log.v(TAG, "readChar " + svcID + " " + authReq);
 
         ServiceWrapper w = getServiceWrapper(connID);
         if (w == null || w.mCallback == null) {
@@ -846,7 +844,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         byte[] value = null;
 
         if (!w.svcID.equals(svcID.getSrvcId())) {
-            Log.e(TAG, "wrong service ID");
+            Log.e(TAG, "wrong service ID " + w.svcID + ", " + svcID.getSrvcId());
         } else {
             value = this.internalGetCharacteristicWrapperValue(connID, svcID);
         }
