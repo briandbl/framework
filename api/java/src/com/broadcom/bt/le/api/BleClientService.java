@@ -575,6 +575,7 @@ public abstract class BleClientService
         Log.d(TAG,
                 "readNextCharacteristic characteristicID = " + characteristicID.toString()
                         + " char inst id = " + characteristicID.getInstanceID());
+        Log.d(TAG, "serviceID = " + svcId.toString());
 
         int ret = BleConstants.GATT_SUCCESS;
         int connID = BleConstants.GATT_INVALID_CONN_ID;
@@ -784,10 +785,9 @@ public abstract class BleClientService
                 BluetoothGattID descriptorID)
         {
             Log.d(BleClientService.TAG, "onGetFirstCharacteristicDescriptor "
-                    + characteristicID.toString() + " status = " + status);
-
-            BluetoothDevice device = BleClientService.this.mProfile
-                    .getDeviceforConnId(connID);
+                    + "svc: " + svcId + ", char: "+ characteristicID + " status = " + status);
+                    		
+            BluetoothDevice device = BleClientService.this.mProfile.getDeviceforConnId(connID);
             if ((device == null)
                     || (BleClientService.this.mProfile.isDeviceDisconnecting(device))) {
                 Log.e(BleClientService.TAG,
@@ -796,7 +796,8 @@ public abstract class BleClientService
             }
 
             if (status != BleConstants.GATT_SUCCESS) {
-                BleClientService.this.readNextCharacteristic(
+                Log.v(TAG, "asking for readNextCharacteristic with " + svcId + ", " + characteristicID);
+                readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         BleApiHelper.gatt2BleID(svcId),
                         BleApiHelper.gatt2BleID(characteristicID));
@@ -878,7 +879,8 @@ public abstract class BleClientService
             if (status != BleConstants.GATT_SUCCESS) {
                 BleClientService.this.readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
+                        BleApiHelper.gatt2BleID(svcId), 
+                        BleApiHelper.gatt2BleID(characteristicID));
                 return;
             }
 
@@ -931,7 +933,7 @@ public abstract class BleClientService
                         svcId.getInstanceID());
 
                 Log.d(BleClientService.TAG,
-                        "characteristic ID = " + characteristicID.toString() + "instance ID = "
+                        "characteristic ID = " + characteristicID.toString() + " instance ID = "
                                 + characteristicID.getInstanceID());
 
                 BleCharacteristic characteristic = null;
@@ -981,9 +983,9 @@ public abstract class BleClientService
         public void onReadCharacteristicValue(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID, byte[] data)
         {
-            Log.d(BleClientService.TAG, "onReadCharacteristicValue charID = "
-                    + characteristicID.toString() + " status = " + status);
-
+            Log.d(BleClientService.TAG, "onReadCharacteristicValue status = " + status);
+            Log.d(BleClientService.TAG, "charID = " + characteristicID.toString());
+            
             BleCharacteristic c = findCharacteristic(connID,
                     BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
 
@@ -998,6 +1000,7 @@ public abstract class BleClientService
                 return;
             }
 
+            Log.v(TAG, "setting read char value");
             c.setValue(data);
             if (BleClientService.this.mReadDescriptors)
             {
