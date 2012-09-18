@@ -31,6 +31,7 @@ import com.broadcom.bt.service.gatt.BluetoothGattInclSrvcID;
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
 
 import org.freedesktop.dbus.Path;
+import org.freedesktop.dbus.UInt32;
 import org.freedesktop.dbus.Variant;
 import org.freedesktop.dbus.exceptions.DBusException;
 
@@ -139,9 +140,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         Variant c = null;
         if (prop.containsKey("Class"))
             c = prop.get("Class");
-        if (c != null && (Integer) c.getValue() != 0)
+        
+        if (c != null && ((UInt32) c.getValue()).intValue()!=0)
             return BleAdapter.DEVICE_TYPE_DUMO;
-
+        
+            
         return BleAdapter.DEVICE_TYPE_BLE;
     }
 
