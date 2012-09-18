@@ -3,6 +3,7 @@ package com.broadcom.bt.le.api;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.util.Log;
 
 import com.broadcom.bt.service.gatt.BluetoothGattID;
 
@@ -108,8 +109,11 @@ public final class BleGattID extends BluetoothGattID
      * Get the UUID type represented by this BleGattID (16 or 128 bit).
      */
     public UUID getUuid() {
-        if (getUuidType() == BleConstants.GATT_UUID_TYPE_128)
+        if (getUuidType() == BleConstants.GATT_UUID_TYPE_128){
+            Log.v(TAG, "returning 128b BleGattID " + super.getUuid());
             return super.getUuid();
+        }
+        Log.v(TAG, "making uuid out of 16b gattID " + Integer.toHexString(this.getUuid16()));
         return UUID.fromString(String.format(BASE_UUID_TPL,
                 new Object[] {
                     Integer.valueOf(getUuid16())
@@ -155,10 +159,13 @@ public final class BleGattID extends BluetoothGattID
         }
 
         if (!(target instanceof BleGattID)) {
-            return false;
+            return super.equals(target);
         }
 
         BleGattID lhs = (BleGattID) target;
+        UUID mine = this.getUuid();
+        UUID other = lhs.getUuid();
+        Log.v(TAG, "compairing " + mine + " " + other);
         return getUuid().equals(lhs.getUuid());
     }
 
