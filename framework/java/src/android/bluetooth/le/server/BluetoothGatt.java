@@ -31,6 +31,7 @@ import com.broadcom.bt.service.gatt.IBluetoothGatt;
 
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
+import org.freedesktop.dbus.exceptions.DBusException;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -816,39 +817,62 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
          */
     }
+    
+    
+    private CharacteristicWrapper internalCharacteristicWrapper(int connID, BluetoothGattCharID svcID){
+        if (svcID == null)
+            return null;
+        
+        List<CharacteristicWrapper> l = solveCharacteristics(connID, svcID.getSrvcId());
+        if (l==null || l.size() == 0)
+            return null;
+        
+        BluetoothGattID charID = svcID.getCharId();
+        
+        Iterator<CharacteristicWrapper> icw = l.iterator();
+        while (icw.hasNext()){
+            CharacteristicWrapper cw = icw.next();
+            if (charID.equals(cw.gattID)){
+                Log.v(TAG, "found match");
+                return cw;
+            }
+        }
+        return null;
+    }
+
 
     @Override
-    public void readChar(int connID, BluetoothGattCharID charID, byte authReq) {
+    public void readChar(int connID, BluetoothGattCharID svcID, byte authReq) {
 
         Log.v(TAG, "readChar\n");
 
         ServiceWrapper w = getServiceWrapper(connID);
-        Log.v(TAG, "got ser wrapper");
-
-        List<CharacteristicWrapper> lcw = solveCharacteristics(connID, charID.getSrvcId());
-
-        int i = 0;
-        for (CharacteristicWrapper cw : lcw) {
-            if (cw.gattID.equals(charID.getCharId()))
-                break;
-            i++;
-        }
-
-        if (i == lcw.size()) {
-            Log.v(TAG, "out of bounds");
-            w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_ERROR,
-                    charID.getSrvcId(), charID.getCharId(), null);
+        if (w == null || w.mCallback == null) {
+            Log.e(TAG, "no service wrapper or callback can't do anything");
             return;
         }
 
-        Log.v(TAG, "char wrapper " + i);
+        Log.v(TAG, "got ser wrapper");
 
-        CharacteristicWrapper cw = lcw.get(i);
-        Log.v(TAG, "got char wrapper");
+        CharacteristicWrapper cw = internalCharacteristicWrapper(connID, svcID);
+        byte[] value = null;
+        if (cw != null) {
+            try {
+                value = mBluezInterface.GetCharacteristicValueValue(cw.path);
+            } catch (Exception e) {
+                Log.e(TAG, "failed getting characteristic value", e);
+            }
+        }
 
-        w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS,
-                charID.getSrvcId(), charID.getCharId(),
-                mBluezInterface.GetCharacteristicValueValue(cw.path));
+        int status = value != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
+
+        Log.v(TAG, "doing onReadCharacteristicValue status: " + status + " value: " + value);
+        try {
+            w.mCallback.onReadCharacteristicValue(connID, status, svcID.getSrvcId(),
+                    svcID.getCharId(), value);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed doing onReadCharacteristicValue");
+        }
     }
 
     @Override
