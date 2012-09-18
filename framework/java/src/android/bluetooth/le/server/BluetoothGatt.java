@@ -274,7 +274,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         } catch (RemoteException e) {
             Log.e(TAG, "failed registering receiver");
         }
-        
     }
 
     @Override
@@ -289,7 +288,15 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void getUUIDs(String address) {
-        List<String> uuids = mBluezInterface.getUUIDs(address);
+        List<String> uuids = null;
+        
+        try {
+            uuids = mBluezInterface.getUUIDs(address);
+        } catch (Exception e) {
+            Log.e(TAG, "failed to get uuids for " + address, e);
+            return;
+        }
+        
         BluetoothDevice d = mAdapter.getRemoteDevice(address);
         for (String u : uuids) {
             Intent intent = new Intent(BleAdapter.ACTION_UUID);
@@ -301,7 +308,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         intent.putExtra(BleAdapter.EXTRA_DEVICE, d);
 
         broadcastIntent(intent);
-
     }
 
     class AppWrapper {
