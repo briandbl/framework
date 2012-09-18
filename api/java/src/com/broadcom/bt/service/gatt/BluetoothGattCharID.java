@@ -98,7 +98,7 @@ public final class BluetoothGattCharID
     }
     
     public String toString(){
-        return "CharID " + this.getCharId() + " " + this.getSrvcId();
+        return "Service: " + this.getSrvcId() + ", Char: " + this.getCharId();
     }
 
 }
