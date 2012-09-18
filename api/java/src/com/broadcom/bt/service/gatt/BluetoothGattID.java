@@ -17,7 +17,7 @@ public class BluetoothGattID
     private int mUuid16 = -1;
     private int mType = -1;
     private int mServiceType = -1;
-    private static final String TAG = "BluetoothGattID";
+    protected static final String TAG = "BluetoothGattID";
     
     @SuppressWarnings({"unchecked", "rawtypes"})
     
