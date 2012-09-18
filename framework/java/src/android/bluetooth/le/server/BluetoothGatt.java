@@ -5,7 +5,6 @@ import android.app.ActivityManagerNative;
 import android.app.IActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.le.server.BlueZInterface.BlueZConnectionError;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IIntentReceiver;
@@ -30,17 +29,13 @@ import com.broadcom.bt.service.gatt.BluetoothGattID;
 import com.broadcom.bt.service.gatt.BluetoothGattInclSrvcID;
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
 
-import org.bluez.Characteristic;
-import org.bluez.Error.DoesNotExist;
-import org.bluez.Error.InvalidArguments;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
-import org.freedesktop.dbus.exceptions.DBusException;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -641,53 +636,51 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     {
         internalGetFirstChar(connID, serviceID, id);
     }
+    
+    private BluetoothGattID internalGetNextChar(int connID, BluetoothGattCharID svcID){
+        if (svcID == null)
+            return null;
+        
+        List<CharacteristicWrapper> l = solveCharacteristics(connID, svcID.getSrvcId());
+        if (l==null || l.size() == 0)
+            return null;
+        
+        BluetoothGattID charID = svcID.getCharId();
+        
+        Iterator<CharacteristicWrapper> icw = l.iterator();
+        while (icw.hasNext()){
+            CharacteristicWrapper cw = icw.next();
+            if (charID.equals(cw.gattID)){
+                Log.v(TAG, "found match");
+                if (icw.hasNext()) {
+                    Log.v(TAG, "has more chars");
+                    return icw.next().gattID;
+                }
+            }
+        }
+        return null;
+    }
 
     @Override
     public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id) {
-        // TODO Auto-generated method stub
         Log.v(TAG, "getNextChar");
+        Log.v(TAG, connID + ", " + svcID + ", " + id);
+        ServiceWrapper w = getServiceWrapper(connID);
+        
+        if (w == null || w.mCallback == null){
+            Log.e(TAG, "no service wrapper or no callback, can't do anything");
+            return;
+        }
+        
+        BluetoothGattID gid = internalGetNextChar(connID, svcID);
+        int status = gid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
+        
         try {
-            Log.v(TAG, "getNextChar " + connID + ", " + svcID + ", " + id);
-
-            ServiceWrapper w = getServiceWrapper(connID);
-            int i = 0;
-            BluetoothGattID charID = svcID.getCharId();
-            List<CharacteristicWrapper> l = solveCharacteristics(connID, svcID.getSrvcId());
-            for (CharacteristicWrapper cw : l) {
-                if (charID.equals(cw.gattID)) {
-                    break;
-                }
-                i++;
-            }
-            Log.v(TAG, "char i: " + (i+1) + " out of " + l.size());
-            
-            if (w.mCallback==null){
-                Log.e(TAG, "callback is null can't reply with onGetNextCharacteristic");
-                return;
-            }
-
-            if (i == l.size() - 1) {
-                Log.v(TAG, "" + connID + ", " + charID);
-                w.mCallback.onGetNextCharacteristic(connID,
-                            BleConstants.GATT_NOT_FOUND,
-                            svcID.getSrvcId(), null);
-                return;
-            }
-
-            Log.v(TAG, "sending onGetNextCharacteristic " + connID);
-            i++;
-            int status = i < l.size() ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
-            Log.d(TAG, "status " + status);
-            Log.d(TAG, "srvcId " + svcID.getSrvcId());
-            BluetoothGattID gid = null;
-            if (status == BleConstants.GATT_SUCCESS)
-                gid = l.get(i).gattID;
-            Log.d(TAG, "gattID " + gid );
-
             w.mCallback.onGetNextCharacteristic(connID, status,
-                        svcID.getSrvcId(), gid);
-        } catch (Exception e) {
-            Log.e(TAG, "error", e);
+                    svcID.getSrvcId(), gid);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
+                    " charID: " + gid);
         }
     }
 
