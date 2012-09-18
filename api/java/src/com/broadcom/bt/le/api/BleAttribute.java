@@ -336,11 +336,14 @@ public class BleAttribute
      */
     public byte setValue(byte[] value)
     {
-        int length = value.length;
-        if (length > mMaxLength) {
-            length = mMaxLength;
+        int length = 0;
+        if (value!=null) {
+            length = value.length;
+            if (length > mMaxLength) {
+                length = mMaxLength;
+            }
+            System.arraycopy(value, 0, mValue, 0, length);
         }
-        System.arraycopy(value, 0, mValue, 0, length);
         mLength = length;
         mDirty = true;
         return 0;
