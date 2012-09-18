@@ -385,19 +385,37 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
             wrapper = registeredApps.get(appUuid);
             if (wrapper.mCallback.asBinder().pingBinder()) {
                 Log.e(TAG, "uuid is registered and alive");
-                throw new RemoteException("uuid registed and alive");
+                try {
+                    callback.onAppRegistered((byte) BleConstants.GATT_ERROR, (byte)-1);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "failed to tell other end", e);
+                }
+                return;
             }
             Log.v(TAG, "no ping back " + appUuid + " registering again");
         }
+        int status = BleConstants.GATT_SUCCESS;
 
         if (wrapper == null) {
             if (mNextAppID == Byte.MAX_VALUE)
-                throw new RemoteException("Can't register more services");
-            wrapper = new AppWrapper(appUuid, ++mNextAppID, callback);
+                status = BleConstants.GATT_ERROR;
+            else 
+                wrapper = new AppWrapper(appUuid, ++mNextAppID, callback);
         }
-        this.registeredAppsByID[wrapper.mIfaceID] = wrapper;
-        registeredApps.put(appUuid, wrapper);
-        callback.onAppRegistered((byte) BleConstants.GATT_SUCCESS, wrapper.mIfaceID);
+        
+        byte ifaceID = -1;
+        
+        if (wrapper != null){
+            this.registeredAppsByID[wrapper.mIfaceID] = wrapper;
+            registeredApps.put(appUuid, wrapper);
+            ifaceID = wrapper.mIfaceID;
+        }
+        
+        try {
+            callback.onAppRegistered((byte)status, ifaceID);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Faield to notify AppRegistered", e);
+        }
     }
 
     @Override
