@@ -398,7 +398,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 status = BleConstants.GATT_ERROR;
             else
                 wrapper = new AppWrapper(appUuid, ++mNextAppID, callback);
-        }
+        } else
+            wrapper.mCallback = callback;
 
         byte ifaceID = -1;
 
@@ -1011,18 +1012,48 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
     
     @Override
-    public void close(byte interfaceID, String remote, int clientID, boolean foreground) {
+    public void close(final byte interfaceID, final String remote, int clientID, boolean foreground) {
         Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID + " clientID " + clientID);
 
         for (Map.Entry<Integer, ConnectionWrapper> e: mConnectionMap.entrySet()){
-            ConnectionWrapper cw = e.getValue();
-            if (cw.remote.equalsIgnoreCase(remote)){
-                Log.v(TAG, "found a possible match");
-                if (e.getKey().intValue() == interfaceID)
-                    Log.v(TAG, "interfaceID match");
-                if (e.getKey().intValue() == clientID)
-                    Log.v(TAG, "clientID match");
-            }
+            final ConnectionWrapper cw = e.getValue();
+            if (!cw.remote.equalsIgnoreCase(remote))
+                continue;
+                
+            Log.v(TAG, "found a possible match");
+            int v = e.getKey().intValue();
+            if (v != interfaceID && v != clientID)
+                continue;
+
+            Log.v(TAG, "real match");
+
+            Thread t = new Thread() {
+                public void run() {
+                    try {
+                        mBluezInterface.getDevice(remote).Disconnect();
+                    } catch (Exception e) {
+                        Log.e(TAG, "error while disconnecting, ignoring", e);
+                    }
+
+                    try {
+                        mConnectionMap.remove(new Integer(interfaceID));
+                        cw.wrapper.mCallback.onDisconnected(interfaceID, remote);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "error during connection", e);
+                    }
+
+                    if (mNotificationListener.containsKey(remote))
+                        mNotificationListener.remove(remote);
+
+                }
+            };
+
+            if (foreground)
+                t.run();
+            else
+                t.start();
+
+            break;
         }
     }
 
