@@ -5,6 +5,7 @@ import android.app.ActivityManagerNative;
 import android.app.IActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.server.BlueZInterface.BlueZConnectionError;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IIntentReceiver;
@@ -30,8 +31,11 @@ import com.broadcom.bt.service.gatt.BluetoothGattInclSrvcID;
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
 
 import org.bluez.Characteristic;
+import org.bluez.Error.DoesNotExist;
+import org.bluez.Error.InvalidArguments;
 import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.Variant;
+import org.freedesktop.dbus.exceptions.DBusException;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -90,7 +94,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
     };
 
-    public BluetoothGatt(Context ctx) throws RemoteException {
+    public BluetoothGatt(Context ctx) {
         Log.v(TAG, "new bluetoothGatt");
 
         mContext = ctx;
@@ -111,15 +115,21 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
     }
 
+    @SuppressWarnings("rawtypes")
     @Override
-    public byte getDeviceType(String address) throws RemoteException {
+    public byte getDeviceType(String address) {
         @SuppressWarnings("rawtypes")
-        Map<String, Variant> prop = mBluezInterface.getDeviceProperties(address);
+        Map<String, Variant> prop = null;
+        try {
+            prop = mBluezInterface.getDeviceProperties(address);
+        } catch (Exception e) {
+            Log.e(TAG, "error on getDeviceType", e);
+        }
         if (prop == null)
             return BleConstants.GATT_UNDEFINED;
 
         /**
-         * LE provides - Address, RSSI, Name, Paired Broadcaster UUIDs Class 0
+         * LE provides - Address, RSSI, Name, Paired, Broadcaster, UUIDs, Class 0
          * or no class at all<br>
          * <br>
          * BD/EDR provides: Address Class Icon RSSI Name Alias LegacyPairing
@@ -129,6 +139,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
                 && prop.containsKey("LegacyPairing"))
             return BleAdapter.DEVICE_TYPE_BREDR;
 
+        Variant c = null;
+        if (prop.containsKey("Class"))
+            c = prop.get("Class");
+        if (c!=null && (Integer)c.getValue()!=0)
+            return BleAdapter.DEVICE_TYPE_DUMO;
+        
         return BleAdapter.DEVICE_TYPE_BLE;
     }
 
@@ -211,7 +227,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     public void broadcastIntent(Intent intent) {
-
         if (mBroadcast == null) {
             Log.v(TAG, "no broadcastIntent, sorry");
             return;
@@ -244,26 +259,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         try {
             mBroadcast.invoke(mAm, args);
-        } catch (IllegalArgumentException e) {
-            // TODO Auto-generated catch block
-            Log.e(TAG, "error", e);
-        } catch (IllegalAccessException e) {
-            // TODO Auto-generated catch block
-            Log.e(TAG, "error", e);
-        } catch (InvocationTargetException e) {
-            // TODO Auto-generated catch block
-            Log.e(TAG, "error", e);
         } catch (Exception e) {
-            Log.e(TAG, "error", e);
+            Log.e(TAG, "failed to broadcast signal!", e);
         }
     }
-
-    private void registerBroadcastReceiver(BroadcastReceiver receiver, IntentFilter filter)
-            throws RemoteException {
+        
+    private void registerBroadcastReceiver(BroadcastReceiver receiver, IntentFilter filter) {
         Log.v(TAG, "registering broadcast receiver");
         IBroadcastReceiver ireceiver = new IBroadcastReceiver(receiver);
-        mAm.registerReceiver(null, null, ireceiver, filter, null);
-        Log.v(TAG, "registered");
+        try {
+            mAm.registerReceiver(null, null, ireceiver, filter, null);
+            Log.v(TAG, "registered");
+            return;
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed registering receiver");
+        }
+        
     }
 
     @Override
@@ -277,7 +288,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void getUUIDs(String address) throws RemoteException {
+    public void getUUIDs(String address) {
         List<String> uuids = mBluezInterface.getUUIDs(address);
         BluetoothDevice d = mAdapter.getRemoteDevice(address);
         for (String u : uuids) {
@@ -321,8 +332,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     private Map<Integer, ConnectionWrapper> mConnectionMap = new HashMap<Integer, ConnectionWrapper>();
 
     @Override
-    public void open(byte interfaceID, final String remote, boolean foreground)
-            throws RemoteException {
+    public void open(byte interfaceID, final String remote, boolean foreground) {
         // TODO Auto-generated method stub
         Log.v(TAG, "open " + interfaceID + " " + remote);
 
@@ -354,8 +364,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void registerApp(BluetoothGattID appUuid, IBleClientCallback callback)
-            throws RemoteException {
+    public void registerApp(BluetoothGattID appUuid, IBleClientCallback callback) {
         AppWrapper wrapper = null;
         Log.v(TAG, "register app " + appUuid + " callback " + callback);
         if (registeredApps.containsKey(appUuid)) {
@@ -380,7 +389,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void unregisterApp(byte interfaceID) throws RemoteException {
+    public void unregisterApp(byte interfaceID)  {
         for (Entry<BluetoothGattID, AppWrapper> v : registeredApps.entrySet()) {
             if (v.getValue().mIfaceID == interfaceID) {
                 if (v.getValue().mCallback.asBinder().pingBinder())
@@ -396,15 +405,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void setEncryption(String address, byte action) throws RemoteException {
+    public void setEncryption(String address, byte action) {
         // TODO Auto-generated method stub
         Log.v(TAG, "setEncryption " + address + " " + action);
         this.mAdapter.getRemoteDevice(address).createBond();
     }
 
     @Override
-    public void searchService(final int connID, final BluetoothGattID serviceID)
-            throws RemoteException {
+    public void searchService(final int connID, final BluetoothGattID serviceID) {
         // TODO Auto-generated method stub
         Log.v(TAG, "searchService " + connID + " " + serviceID);
 
@@ -518,7 +526,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         mRemoteServices.get(remote).mCharacteristics.put(serPath, t);
     }
 
-    private ConnectionWrapper getConnectionWrapper(int connID) throws RemoteException {
+    private ConnectionWrapper getConnectionWrapper(int connID) {
         if (!mConnectionMap.containsKey(new Integer(connID))) {
             throw new RemoteException("invalid device");
         }
@@ -527,20 +535,20 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         return conn;
     }
 
-    private ServiceWrapper getServiceWrapper(String remote) throws RemoteException {
+    private ServiceWrapper getServiceWrapper(String remote) {
         if (!mRemoteServices.containsKey(remote))
             throw new RemoteException("Address not in cache");
         return mRemoteServices.get(remote);
     }
 
-    private ServiceWrapper getServiceWrapper(int connID) throws RemoteException {
+    private ServiceWrapper getServiceWrapper(int connID) {
         ConnectionWrapper conn = getConnectionWrapper(connID);
         return getServiceWrapper(conn.remote);
 
     }
 
     private List<CharacteristicWrapper> solveCharacteristics(int connID,
-            BluetoothGattID serviceID) throws RemoteException {
+            BluetoothGattID serviceID) {
         ConnectionWrapper conn = getConnectionWrapper(connID);
         ServiceWrapper ser = getServiceWrapper(connID);
 
@@ -560,15 +568,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
-            String address, IBleCharacteristicDataCallback callback)
-            throws RemoteException {
+            String address, IBleCharacteristicDataCallback callback) {
         Log.v(TAG, "registerServiceDataCallback");
         ServiceWrapper w = getServiceWrapper(connID);
         w.mCallback = callback;
     }
 
-    public void internalGetFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id)
-            throws RemoteException {
+    public void internalGetFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id) {
         Log.v(TAG, "getFirstChar " + connID + ", " + serviceID + ", " + id);
         ServiceWrapper w = getServiceWrapper(connID);
         List<CharacteristicWrapper> lcw = solveCharacteristics(connID, serviceID);
@@ -600,8 +606,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id)
-            throws RemoteException {
+    public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id) {
         // TODO Auto-generated method stub
         Log.v(TAG, "getNextChar");
         try {
@@ -650,16 +655,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void readCharDescr(int connID, BluetoothGattCharDescrID charDescID, byte authReq)
-            throws RemoteException {
+    public void readCharDescr(int connID, BluetoothGattCharDescrID charDescID, byte authReq) {
         Log.v(TAG, "readCharDescr " + connID + " " + charDescID);
         // TODO Auto-generated method stub
 
     }
 
     @Override
-    public void getFirstCharDescr(int connID, BluetoothGattCharID charID, BluetoothGattID id)
-            throws RemoteException {
+    public void getFirstCharDescr(int connID, BluetoothGattCharID charID, BluetoothGattID id) {
 
         // BlueZ doesn't support this over DBUS yet, so it makes no sense to do any processing here.
         ServiceWrapper w = getServiceWrapper(connID);
@@ -703,7 +706,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void getNextCharDescr(int connID, BluetoothGattCharDescrID charDescrID,
-            BluetoothGattID id) throws RemoteException {
+            BluetoothGattID id) {
         Log.v(TAG, "getNextCharDescr " + connID + " " + charDescrID + " " + id);
 
         ServiceWrapper w = getServiceWrapper(connID);
@@ -751,8 +754,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void readChar(int connID, BluetoothGattCharID charID, byte authReq)
-            throws RemoteException {
+    public void readChar(int connID, BluetoothGattCharID charID, byte authReq) {
 
         Log.v(TAG, "readChar\n");
 
@@ -787,7 +789,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void writeCharValue(int connID, BluetoothGattCharID charID, int writeType, byte authReq,
-            byte[] value) throws RemoteException {
+            byte[] value) {
         // TODO Auto-generated method stub
         Log.v(TAG, "writeCharValue for " + charID);
         ServiceWrapper w = getServiceWrapper(connID);
@@ -821,12 +823,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public int getApiLevel() throws RemoteException {
+    public int getApiLevel() {
         return API_LEVEL;
     }
 
     @Override
-    public String getFrameworkVersion() throws RemoteException {
+    public String getFrameworkVersion() {
         return FRAMEWORK_VERSION;
     }
 
@@ -836,7 +838,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public boolean registerForNotifications(byte ifaceID, String address,
-            BluetoothGattCharID charID) throws RemoteException {
+            BluetoothGattCharID charID) {
         Log.i(TAG,
                 "registering for notifications from " + address + " for uuid " + charID.getCharId());
 
@@ -870,7 +872,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public boolean deregisterForNotifications(byte interfaceID, String address,
-            BluetoothGattCharID charID) throws RemoteException {
+            BluetoothGattCharID charID) {
 
         if (!mNotificationListener.containsKey(address)) {
             Log.e(TAG, "deregisterForNotifications for non registered remote device");
@@ -897,7 +899,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void setScanParameters(int scanInterval, int scanWindow) throws RemoteException {
+    public void setScanParameters(int scanInterval, int scanWindow) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI setscanparam\n");
@@ -905,7 +907,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void filterEnable(boolean p) throws RemoteException {
+    public void filterEnable(boolean p) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI filterenable\n");
@@ -914,8 +916,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void filterEnableBDA(boolean enable, int addr_type, String address)
-            throws RemoteException {
+    public void filterEnableBDA(boolean enable, int addr_type, String address) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI filterenablebda\n");
@@ -924,7 +925,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void clearManufacturerData() throws RemoteException {
+    public void clearManufacturerData() {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI clearmanufcdata\n");
@@ -934,7 +935,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void filterManufacturerData(int company, byte[] data1, byte[] data2, byte[] data3,
-            byte[] data4) throws RemoteException {
+            byte[] data4) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI filtermanufacdata\n");
@@ -944,7 +945,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void filterManufacturerDataBDA(int company, byte[] data1, byte[] data2, byte[] data3,
-            byte[] data4, boolean has_bda, int addr_type, String address) throws RemoteException {
+            byte[] data4, boolean has_bda, int addr_type, String address) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI filtermanufdataBDA\n");
@@ -953,7 +954,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void observe(boolean start, int duration) throws RemoteException {
+    public void observe(boolean start, int duration) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI observe\n");
@@ -962,8 +963,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void close(byte interfaceID, String remote, int clientID, boolean foreground)
-            throws RemoteException {
+    public void close(byte interfaceID, String remote, int clientID, boolean foreground) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI close\n");
@@ -972,8 +972,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void getFirstIncludedService(int connID, BluetoothGattID serviceID, BluetoothGattID id2)
-            throws RemoteException {
+    public void getFirstIncludedService(int connID, BluetoothGattID serviceID, BluetoothGattID id2) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI getFirstIncServ\n");
@@ -983,7 +982,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void getNextIncludedService(int connID, BluetoothGattInclSrvcID includedServiceID,
-            BluetoothGattID id) throws RemoteException {
+            BluetoothGattID id) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI getNextIncServ\n");
@@ -993,7 +992,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void writeCharDescrValue(int connID, BluetoothGattCharDescrID descID, int writeType,
-            byte authReq, byte[] value) throws RemoteException {
+            byte authReq, byte[] value) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI writechardescrvale\n");
@@ -1002,7 +1001,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void sendIndConfirm(int connID, BluetoothGattCharID charID) throws RemoteException {
+    public void sendIndConfirm(int connID, BluetoothGattCharID charID) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI sendindconfig\n");
@@ -1012,7 +1011,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void prepareWrite(int paramInt1, BluetoothGattCharID charID, int paramInt2,
-            int paramInt3, byte[] paramArrayOfByte) throws RemoteException {
+            int paramInt3, byte[] paramArrayOfByte) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI prepwriter\n");
@@ -1021,7 +1020,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void executeWrite(int paramInt, boolean paramBoolean) throws RemoteException {
+    public void executeWrite(int paramInt, boolean paramBoolean) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI execwriter\n");
@@ -1031,7 +1030,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void registerServerServiceCallback(BluetoothGattID id1, BluetoothGattID id2,
-            IBleServiceCallback callback) throws RemoteException {
+            IBleServiceCallback callback) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI regServiceCallback\n");
@@ -1040,8 +1039,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void registerServerProfileCallback(BluetoothGattID id, IBleProfileEventCallback callback)
-            throws RemoteException {
+    public void registerServerProfileCallback(BluetoothGattID id, IBleProfileEventCallback callback) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI regServerProfCallback\n");
@@ -1050,7 +1048,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void unregisterServerServiceCallback(int paramInt) throws RemoteException {
+    public void unregisterServerServiceCallback(int paramInt) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI unregServServcall\n");
@@ -1059,7 +1057,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void unregisterServerProfileCallback(int paramInt) throws RemoteException {
+    public void unregisterServerProfileCallback(int paramInt) {
         // TODO Auto-generated method stub
 
         Log.v(TAG, "NI unrefServerProfCallback\n");
@@ -1068,15 +1066,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     }
 
     @Override
-    public void GATTServer_CreateService(byte paramByte, BluetoothGattID id, int paramInt)
-            throws RemoteException {
+    public void GATTServer_CreateService(byte paramByte, BluetoothGattID id, int paramInt) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_AddIncludedService(int paramInt1, int paramInt2) throws RemoteException {
+    public void GATTServer_AddIncludedService(int paramInt1, int paramInt2) {
         // TODO Auto-generated method stub
         System.exit(0);
 
@@ -1084,36 +1081,35 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void GATTServer_AddCharacteristic(int paramInt1, BluetoothGattID id, int paramInt2,
-            int paramInt3, boolean paramBoolean, int paramInt4) throws RemoteException {
+            int paramInt3, boolean paramBoolean, int paramInt4) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_AddCharDescriptor(int paramInt1, int paramInt2, BluetoothGattID id)
-            throws RemoteException {
+    public void GATTServer_AddCharDescriptor(int paramInt1, int paramInt2, BluetoothGattID id) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_DeleteService(int paramInt) throws RemoteException {
+    public void GATTServer_DeleteService(int paramInt) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_StartService(int paramInt, byte paramByte) throws RemoteException {
+    public void GATTServer_StartService(int paramInt, byte paramByte) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_StopService(int paramInt) throws RemoteException {
+    public void GATTServer_StopService(int paramInt) {
         // TODO Auto-generated method stub
         System.exit(0);
 
@@ -1121,7 +1117,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void GATTServer_HandleValueIndication(int paramInt1, int paramInt2,
-            byte[] paramArrayOfByte) throws RemoteException {
+            byte[] paramArrayOfByte) {
         // TODO Auto-generated method stub
         System.exit(0);
 
@@ -1129,7 +1125,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void GATTServer_HandleValueNotification(int paramInt1, int paramInt2,
-            byte[] paramArrayOfByte) throws RemoteException {
+            byte[] paramArrayOfByte) {
         // TODO Auto-generated method stub
         System.exit(0);
 
@@ -1137,31 +1133,28 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void GATTServer_SendRsp(int paramInt1, int paramInt2, byte paramByte1, int paramInt3,
-            int paramInt4, byte[] paramArrayOfByte, byte paramByte2, boolean paramBoolean)
-            throws RemoteException {
+            int paramInt4, byte[] paramArrayOfByte, byte paramByte2, boolean paramBoolean) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_Open(byte paramByte, String paramString, boolean paramBoolean)
-            throws RemoteException {
+    public void GATTServer_Open(byte paramByte, String paramString, boolean paramBoolean) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_CancelOpen(byte paramByte, String paramString, boolean paramBoolean)
-            throws RemoteException {
+    public void GATTServer_CancelOpen(byte paramByte, String paramString, boolean paramBoolean) {
         // TODO Auto-generated method stub
         System.exit(0);
 
     }
 
     @Override
-    public void GATTServer_Close(int paramInt) throws RemoteException {
+    public void GATTServer_Close(int paramInt) {
         // TODO Auto-generated method stub
         System.exit(0);
 
@@ -1169,7 +1162,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     @Override
     public void valueChanged(String path, byte[] val) {
-
         String[] p = path.split("/");
         String dev = p[p.length - 2];
         Log.v(TAG, "device " + dev);
