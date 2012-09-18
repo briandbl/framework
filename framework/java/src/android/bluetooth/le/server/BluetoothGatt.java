@@ -423,7 +423,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         for (Entry<BluetoothGattID, AppWrapper> v : registeredApps.entrySet()) {
             if (v.getValue().mIfaceID == interfaceID) {
                 if (v.getValue().mCallback.asBinder().pingBinder())
-                    v.getValue().mCallback.onAppDeregistered(interfaceID);
+                    try {
+                        v.getValue().mCallback.onAppDeregistered(interfaceID);
+                    } catch (RemoteException e) {
+                        Log.e(TAG, "failed notifying client of deregistration", e);
+                    }
                 registeredApps.remove(v.getKey());
                 Log.v(TAG, "app successfully unregistered for interface: " + interfaceID +
                         ", uuid: " + v.getValue().mGattID);
