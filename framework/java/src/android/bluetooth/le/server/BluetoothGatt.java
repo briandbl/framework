@@ -687,20 +687,44 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     @Override
     public void readCharDescr(int connID, BluetoothGattCharDescrID charDescID, byte authReq) {
         Log.v(TAG, "readCharDescr " + connID + " " + charDescID);
-        // TODO Auto-generated method stub
-
+        
+        ServiceWrapper w = getServiceWrapper(connID);
+        
+        if (w == null || w.mCallback == null){
+            Log.e(TAG, "no service wrapper or no callback, can't do anything");
+            return;
+        }
+        
+        Log.v(TAG, "No support for this, so we will tell we can't find it");
+        
+        try {
+            w.mCallback.onReadCharDescriptorValue(connID, BleConstants.GATT_NOT_FOUND, 
+                    null, null, null, null);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed sending onReadCharDescriptorValue");
+        }
     }
 
     @Override
     public void getFirstCharDescr(int connID, BluetoothGattCharID charID, BluetoothGattID id) {
-
+        Log.v(TAG, "getFirstCharDescr");
         // BlueZ doesn't support this over DBUS yet, so it makes no sense to do any processing here.
         ServiceWrapper w = getServiceWrapper(connID);
-        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
-                charID.getSrvcId(), charID.getSrvcId(),
-                null);
 
+        if (w == null || w.mCallback == null){
+            Log.e(TAG, "no service wrapper or no callback, can't do anything");
+            return;
+        }
         
+        Log.w(TAG, "not supported");
+        
+        try {
+            w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
+                    charID.getSrvcId(), charID.getSrvcId(), null);
+        } catch (RemoteException e) {
+            Log.e(TAG, "onGetFirstCharacteristicDescriptor", e);
+        }
+
         /*
         Log.v(TAG, "getFirstCharDescr " + connID + " " + charID + " " + id);
 
@@ -738,15 +762,25 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     public void getNextCharDescr(int connID, BluetoothGattCharDescrID charDescrID,
             BluetoothGattID id) {
         Log.v(TAG, "getNextCharDescr " + connID + " " + charDescrID + " " + id);
-
-        ServiceWrapper w = getServiceWrapper(connID);
-        Log.v(TAG, "got ser wrapper");
-
+        
         // BlueZ doesn't support this over DBUS yet, so it makes no sense to do any processing here.
-        w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
-                charDescrID.getSrvcId(), charDescrID.getSrvcId(),
-                null);
+        ServiceWrapper w = getServiceWrapper(connID);
 
+        if (w == null || w.mCallback == null){
+            Log.e(TAG, "no service wrapper or no callback, can't do anything");
+            return;
+        }
+        
+        Log.w(TAG, "not supported");
+        
+        try {
+            w.mCallback.onGetNextCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND, null, 
+                    null, null);
+        } catch (RemoteException e) {
+            Log.e(TAG, "onGetNextCharacteristicDescriptor", e);
+        }
+
+        
         /*
         List<CharacteristicWrapper> lcw = solveCharacteristics(connID, charDescrID.getSrvcId());
 
