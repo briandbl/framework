@@ -17,11 +17,10 @@ public class BluetoothGattID
     private int mUuid16 = -1;
     private int mType = -1;
     private int mServiceType = -1;
-    @SuppressWarnings("unused")
     private static final String TAG = "BluetoothGattID";
-    @SuppressWarnings({
-            "unchecked", "rawtypes"
-    })
+    
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    
     public static final Parcelable.Creator<BluetoothGattID> CREATOR = new Parcelable.Creator()
     {
         public BluetoothGattID createFromParcel(Parcel source) {
@@ -151,11 +150,21 @@ public class BluetoothGattID
 
     public UUID getUuid()
     {
+        if (this.mUuid128==null)
+            return UUID.fromString(this.toString());
         return this.mUuid128;
     }
 
     public int getUuid16()
     {
+        if (this.mUuid16 < 0){
+            String uuid = mUuid128.toString();
+            if (uuid.startsWith("0000") && uuid.endsWith("-0000-1000-8000-00805f9b34fb")){
+                uuid=uuid.split("-")[0];
+                return Integer.parseInt(uuid, 16);
+            }
+            Log.v(TAG, "tried to extract UUID 16 from non SIG UUID16");
+        }
         return this.mUuid16;
     }
 
@@ -215,6 +224,7 @@ public class BluetoothGattID
             Log.v(TAG, "same object");
             return true;
         }
+        
         if (!(target instanceof BluetoothGattID)) {
             Log.v(TAG, "wrong instance");
             return false;
@@ -225,10 +235,7 @@ public class BluetoothGattID
             Log.v(TAG, "different types!, comparing String level");
             return this.toString().toLowerCase().equals(targetId.toString().toLowerCase());
         }
-        if (this.mServiceType != targetId.getServiceType()) {
-            Log.v(TAG, "different service types");
-            return false;
-        }
+        
         if ((this.mType == BleConstants.GATT_UUID_TYPE_128)
                 && (targetId.getInstanceID() == this.mInstId)
                 && (this.mUuid128.equals(targetId.getUuid())))
@@ -264,9 +271,9 @@ public class BluetoothGattID
         if (this.mType == BleConstants.GATT_UUID_TYPE_128) {
             return this.mUuid128 == null ? null : this.mUuid128.toString();
         }
-        return String.valueOf(String.format("%08x-0000-1000-8000-00805f9b34fb",
+        return String.valueOf(String.format("0000%04x-0000-1000-8000-00805f9b34fb",
                 new Object[] {
-                    Integer.valueOf(this.mUuid16)
+                    Integer.valueOf(0x0ffff & this.mUuid16)
                 }));
     }
     
