@@ -4,7 +4,6 @@
 
 package android.bluetooth.le.server;
 
-import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.server.handlers.DeviceFoundHandler;
 import android.util.Log;
 

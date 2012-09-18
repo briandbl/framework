@@ -130,7 +130,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
          * BD/EDR provides: Address Class Icon RSSI Name Alias LegacyPairing
          * Paired UUIDs
          */
-        if (prop.containsKey("Icon") && prop.containsKey("Icon") && prop.containsKey("Alias")
+        if (prop.containsKey("Icon") && prop.containsKey("Alias") 
                 && prop.containsKey("LegacyPairing"))
             return BleAdapter.DEVICE_TYPE_BREDR;
 
@@ -1009,6 +1009,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
         return r.size() > 0;
     }
+    
+    @Override
+    public void close(byte interfaceID, String remote, int clientID, boolean foreground) {
+        Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID + " clientID " + clientID);
+
+        for (Map.Entry<Integer, ConnectionWrapper> e: mConnectionMap.entrySet()){
+            ConnectionWrapper cw = e.getValue();
+            if (cw.remote.equalsIgnoreCase(remote)){
+                Log.v(TAG, "found a possible match");
+                if (e.getKey().intValue() == interfaceID)
+                    Log.v(TAG, "interfaceID match");
+                if (e.getKey().intValue() == clientID)
+                    Log.v(TAG, "clientID match");
+            }
+        }
+    }
 
     @Override
     public void setScanParameters(int scanInterval, int scanWindow) {
@@ -1074,14 +1090,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
 
     }
 
-    @Override
-    public void close(byte interfaceID, String remote, int clientID, boolean foreground) {
-        // TODO Auto-generated method stub
 
-        Log.v(TAG, "NI close\n");
-        System.exit(0);
-
-    }
 
     @Override
     public void getFirstIncludedService(int connID, BluetoothGattID serviceID, BluetoothGattID id2) {
