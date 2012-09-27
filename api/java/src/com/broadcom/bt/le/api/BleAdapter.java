@@ -1,3 +1,21 @@
+/************************************************************************************
+ *
+ *  Copyright (C) 2012      Naranjo Manuel Francisco <naranjo.manuel@gmail.com>
+ *  Copyright (C) 2009-2011 Broadcom Corporation
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ************************************************************************************/
 
 package com.broadcom.bt.le.api;
 
@@ -93,21 +111,25 @@ public class BleAdapter
      */
     public BleAdapter(Context ctx) {
         this.mContext = ctx;
-        if (startService()==false)
+        if (startService() == false)
             throw new RuntimeException("failed connecting to service");
         this.init();
     }
 
     /**
-     * Returns whether the framework com.manuelnaranjo.btle.framework is available
+     * Returns whether the framework com.manuelnaranjo.btle.framework is
+     * available
+     * 
      * @return
      */
     public static boolean checkAPIAvailability() {
         return startService();
     }
-    
+
     /**
-     * Returns the current framework version of the package com.manuelnaranjo.btle.framework
+     * Returns the current framework version of the package
+     * com.manuelnaranjo.btle.framework
+     * 
      * @return
      */
     public static String getFrameworkVersion()
@@ -125,13 +147,13 @@ public class BleAdapter
      * Returns the current Open Bluetooth Low Energy SDK API level.
      * 
      * @return
-     * @throws RuntimeException 
+     * @throws RuntimeException
      */
     public static int getApiLevel()
     {
         if (!startService())
             throw new RuntimeException("Failed to connect to service");
-        
+
         try {
             return mService.getApiLevel();
         } catch (RemoteException e) {

@@ -1,3 +1,21 @@
+/************************************************************************************
+ *
+ *  Copyright (C) 2012      Naranjo Manuel Francisco <naranjo.manuel@gmail.com>
+ *  Copyright (C) 2009-2011 Broadcom Corporation
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ ************************************************************************************/
 
 package com.broadcom.bt.le.api;
 
@@ -785,8 +803,8 @@ public abstract class BleClientService
                 BluetoothGattID descriptorID)
         {
             Log.d(BleClientService.TAG, "onGetFirstCharacteristicDescriptor "
-                    + "svc: " + svcId + ", char: "+ characteristicID + " status = " + status);
-                    		
+                    + "svc: " + svcId + ", char: " + characteristicID + " status = " + status);
+
             BluetoothDevice device = BleClientService.this.mProfile.getDeviceforConnId(connID);
             if ((device == null)
                     || (BleClientService.this.mProfile.isDeviceDisconnecting(device))) {
@@ -796,7 +814,8 @@ public abstract class BleClientService
             }
 
             if (status != BleConstants.GATT_SUCCESS) {
-                Log.v(TAG, "asking for readNextCharacteristic with " + svcId + ", " + characteristicID);
+                Log.v(TAG, "asking for readNextCharacteristic with " + svcId + ", "
+                        + characteristicID);
                 readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
                         BleApiHelper.gatt2BleID(svcId),
@@ -879,7 +898,7 @@ public abstract class BleClientService
             if (status != BleConstants.GATT_SUCCESS) {
                 BleClientService.this.readNextCharacteristic(
                         BleClientService.this.mProfile.getDeviceforConnId(connID),
-                        BleApiHelper.gatt2BleID(svcId), 
+                        BleApiHelper.gatt2BleID(svcId),
                         BleApiHelper.gatt2BleID(characteristicID));
                 return;
             }
@@ -918,7 +937,7 @@ public abstract class BleClientService
                         + "instance id = " + characteristicID.getInstanceID());
             else
                 Log.d(BleClientService.TAG, "no char");
-            
+
             BluetoothDevice device = mProfile.getDeviceforConnId(connID);
             if ((device == null)
                     || (mProfile.isDeviceDisconnecting(device))) {
@@ -985,7 +1004,7 @@ public abstract class BleClientService
         {
             Log.d(BleClientService.TAG, "onReadCharacteristicValue status = " + status);
             Log.d(BleClientService.TAG, "charID = " + characteristicID.toString());
-            
+
             BleCharacteristic c = findCharacteristic(connID,
                     BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
 
