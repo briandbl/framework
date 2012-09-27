@@ -250,6 +250,7 @@ public class BlueZInterface {
     }
 
     class BlueZConnectionError extends Exception {
+        private static final long serialVersionUID = 1L;
     }
 
     public Device getDevice(String address) throws BlueZConnectionError, DBusException {
