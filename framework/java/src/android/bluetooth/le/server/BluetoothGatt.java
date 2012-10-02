@@ -138,15 +138,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         if (prop == null)
             return BleConstants.GATT_UNDEFINED;
 
-        /**
+        /*
          * LE provides - Address, RSSI, Name, Paired, Broadcaster, UUIDs, Class
-         * 0 or no class at all<br>
-         * <br>
-         * BD/EDR provides: Address Class Icon RSSI Name Alias LegacyPairing
-         * Paired UUIDs
+         * 0 or no class at all
+         * 
+         * BD/EDR provides: Address, Class, Icon, RSSI, Name, Alias, LegacyPairing,
+         * Paired, UUIDs
          */
-        if (prop.containsKey("Icon") && prop.containsKey("Alias") 
-                && prop.containsKey("LegacyPairing"))
+        if (prop.containsKey("Icon") && prop.containsKey("LegacyPairing"))
             return BleAdapter.DEVICE_TYPE_BREDR;
 
         Variant c = null;
@@ -270,6 +269,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         }
 
         try {
+            Log.v(TAG, "broadcasting " + args);
             mBroadcast.invoke(mAm, args);
         } catch (Exception e) {
             Log.e(TAG, "failed to broadcast signal!", e);
