@@ -30,6 +30,7 @@ import java.io.InputStreamReader;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,14 +39,38 @@ interface WorkerHandler {
     void lineReceived(String t);
 }
 
-public class GattToolWrapper implements WorkerHandler {
+interface internalGattToolListener {
+    void commandCompleted();
+    void connected();
+    void disconnected();    
+}
+
+public class GattToolWrapper implements WorkerHandler, internalGattToolListener {
     private Process mProcess;
     private DataInputStream mInput;
     private DataOutputStream mOutput;
     private Worker mWorker;
     private GattToolListener mListener;
     private boolean mBusy;
-    private boolean mConnected;
+    
+    private enum STATUS {
+        IDLE,
+        CONNECTING,
+        CONNECTED,
+        DISCONNECTING,
+        PRIMARY_DISCOVERY,
+        PRIMARY_DISCOVERY_UUID,
+        CHARACTERISTICS_DISCOVERY,
+        CHARACTERISTICS_DESCRIPTOR_DISCOVERY,
+        CHARACTERISTICS_READ_UUID,
+        CHARACTERISTICS_READ_HANDLE,
+        CHARACTERISTIC_WRITE_REQ,
+        CHARACTERISTIC_WRITE_CMD,
+        SET_SEC_LEVEL,
+        SET_MTU,
+    };
+    
+    private STATUS mStatus = STATUS.IDLE;
     
     private static Set<GattToolWrapper> workerPool;
     
@@ -83,6 +108,37 @@ public class GattToolWrapper implements WorkerHandler {
         }
     }
     
+    public void commandCompleted(){
+        synchronized (this) {
+            if (mStatus == STATUS.IDLE) {
+                Log.e(TAG, "command complte with status == IDLE");
+                return;
+            }
+
+            if (mStatus == STATUS.CONNECTING || mStatus == STATUS.DISCONNECTING) {
+                Log.v(TAG, "command completed with [dis]connecting status");
+                return;
+            }
+
+            Log.v(TAG, "command completed");
+
+            mStatus = STATUS.CONNECTED;
+        }
+    }
+    
+    public void connected(){
+        synchronized (this) {
+            this.mStatus = STATUS.CONNECTED;
+        }
+            
+    }
+    
+    public void disconnected(){
+        synchronized (this) {
+            this.mStatus = STATUS.IDLE;
+        }
+    }
+    
     private boolean sendCommand(String i){
         if (!mBusy){
             Log.e(TAG, "send command on non busy worker");
@@ -103,47 +159,62 @@ public class GattToolWrapper implements WorkerHandler {
         return mBusy;
     }
     
-    public boolean isConnected(){
-        return mConnected;
-    }
-    
-    public boolean connect(String address){
+    public synchronized boolean connect(String address){
         return this.connect(address, "");
     }
     
-    public boolean connect(String address, String address_type){
-        if (this.mConnected){
+    public synchronized boolean connect(String address, String address_type){
+        if (mStatus != STATUS.IDLE){
             Log.e(TAG, "connect on connected worker");
             return false;
         }
         
+        mStatus = STATUS.CONNECTING;
         return sendCommand("connect " + address + " " + address_type);
     }
     
-    public boolean disconnect(){
-        if (!this.mConnected){
-            Log.e(TAG, "not connected");
+    public synchronized boolean disconnect(){
+        if (mStatus != STATUS.CONNECTED){
+            if (mStatus != STATUS.IDLE)
+                Log.e(TAG, "not connected");
+            else {
+                Log.v(TAG, "some command is running can't disconnect");
+            }
             return false;
         }
         
+        mStatus = STATUS.DISCONNECTING;
         return sendCommand("disconnect");
     }
     
-    public boolean primaryDiscovey(){
-        if (!this.mConnected){
+    public synchronized boolean primaryDiscovery(){
+        if (mStatus == STATUS.IDLE){
             Log.e(TAG, "not connected");
             return false;
         }
         
+        if (mStatus != STATUS.CONNECTED){
+            Log.v(TAG, "a command is running can't start primary discovery");
+            return false;
+        }
+        
+        mStatus = STATUS.PRIMARY_DISCOVERY;
         return sendCommand("primary");
     }
     
-    public boolean primaryDiscoveryByUUID(BleGattID uuid){
-        if (!this.mConnected){
+    public synchronized boolean primaryDiscoveryByUUID(BleGattID uuid){
+        if (mStatus == STATUS.IDLE){
             Log.e(TAG, "not connected");
             return false;
         }
         
+        if (mStatus != STATUS.CONNECTED){
+            Log.v(TAG, "a command is running can't start primary by uuid discovery");
+            return false;
+        }
+        
+        mStatus = STATUS.PRIMARY_DISCOVERY_UUID;
+                
         return sendCommand("primary " + uuid.toString());
     }
 
@@ -156,7 +227,6 @@ public class GattToolWrapper implements WorkerHandler {
         mOutput = new DataOutputStream(mProcess.getOutputStream());
         mWorker = new Worker(mInput, this);
         mBusy = false;
-        mConnected = false;
     }
     
     public void setListener(GattToolListener l){
@@ -233,10 +303,24 @@ public class GattToolWrapper implements WorkerHandler {
         "CHAR-VAL-DESC-END",
         "CHAR-READ-UUID",
         "CHAR-READ-UUID-END",
-        "CHAR-WRITE-SUCCESS",
-        "SEC-LEVEL-SUCCESS",
-        "MTU-SUCCESS",
+        "CHAR-WRITE",
+        "SEC-LEVEL",
+        "MTU",
     };
+
+    private static final Vector<String> END_COMMAND_RESULTS = new Vector<String>();
+    
+    static {
+        END_COMMAND_RESULTS.add("PRIMARY-ALL-END");
+        END_COMMAND_RESULTS.add("PRIMARY-UUID-END");
+        END_COMMAND_RESULTS.add("CHAR-END");
+        END_COMMAND_RESULTS.add("CHAR-VAL-DESC-END");
+        END_COMMAND_RESULTS.add("CHAR-READ-UUID-END");
+        END_COMMAND_RESULTS.add("CHAR-WRITE");
+        END_COMMAND_RESULTS.add("SEC-LEVEL");
+        END_COMMAND_RESULTS.add("MTU");   
+    }
+
     
     private String mLastAddress = null;
 
@@ -253,10 +337,10 @@ public class GattToolWrapper implements WorkerHandler {
             Log.i(TAG, "found prompt " + state + ", " + address + ", " + type);
             mLastAddress = address;
             synchronized (this){
-                if (state=="CON" && ! mConnected)
-                    this.mConnected = true;
-                if (state.trim().length()==0 && mConnected)
-                    this.mConnected = false;
+                if (state=="CON" && mStatus == STATUS.IDLE)
+                    this.mStatus = STATUS.CONNECTED;
+                if (state.trim().length()==0 && mStatus != STATUS.IDLE)
+                    this.mStatus = STATUS.IDLE;
             }
             return;
         }
@@ -279,8 +363,15 @@ public class GattToolWrapper implements WorkerHandler {
                 return;
             }
             
-            if (Response.processLine(this.mListener, command, address, argument))
+            if (Response.processLine(this.mListener, command, address, argument)){
+                if (END_COMMAND_RESULTS.contains(command))
+                {
+                    synchronized (this){
+                        mStatus = STATUS.CONNECTED;
+                    }
+                }
                 return;
+            }
         }
         m = ERROR.matcher(line);
     }
