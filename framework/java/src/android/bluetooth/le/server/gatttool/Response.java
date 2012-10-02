@@ -35,10 +35,8 @@ public class Response {
         return false;
     }
     
-    public static boolean processLine(GattToolListener listener, String command, 
-            String address, String argument){
-        boolean ret = true;
-        
+    public static boolean processLine(GattToolListener listener, 
+            String command, String address, String argument){
         Log.v(TAG, "Processing command: " + command);
         
         if (!sCommands.containsKey(command))
@@ -48,8 +46,7 @@ public class Response {
         
         Log.v(TAG, "addr: " + address + ", " + argument);
         Response cmd = sCommands.get(command);
-        cmd.processArguments(listener, address, argument);
-        return ret;
+        return cmd.processArguments(listener, address, argument);
     }
     
     static {
