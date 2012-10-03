@@ -13,8 +13,8 @@ import java.util.Vector;
 public class GattToolWrapperTester implements GattToolListener {
 
     @Override
-    public synchronized void onNotification(String addr, int handle, byte[] value) {
-        System.out.print("notification " + addr + " " + Integer.toHexString(handle) + " ");
+    public synchronized void onNotification(int conn_handle, int handle, byte[] value) {
+        System.out.print("notification " + conn_handle + " " + Integer.toHexString(handle) + " ");
         if (value != null)
             for (int i = 0; i < value.length; i++)
                 System.out.println(GattToolWrapper.toSignedByteString(value[i]) + " ");
@@ -22,8 +22,8 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void onIndication(String addr, int handle, byte[] value) {
-        System.out.print("notification " + addr + " " + Integer.toHexString(handle) + " ");
+    public synchronized void onIndication(int conn_handle, int handle, byte[] value) {
+        System.out.print("notification " + conn_handle + " " + Integer.toHexString(handle) + " ");
         if (value != null)
             for (int i = 0; i < value.length; i++)
                 System.out.print(GattToolWrapper.toSignedByteString(value[i]) + " ");
@@ -31,48 +31,49 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void connected(String addr, int status) {
-        System.out.println("connected to " + addr + " result " + status + "\n");
+    public synchronized void connected(int conn_handle, String addr, int status) {
+        System.out.println("connected to " + addr + " with handle " + conn_handle
+                + " result " + status + "\n");
         this.notifyAll();
     }
 
     @Override
-    public synchronized void disconnected(String addr) {
-        System.out.println("disconnected " + addr);
+    public synchronized void disconnected(int conn_handle) {
+        System.out.println("disconnected " + conn_handle);
         this.notifyAll();
     }
 
     @Override
-    public void primaryAll(String addr, int start, int end, BleGattID uuid) {
-        System.out.println("primary: " + addr 
+    public void primaryAll(int conn_handle, int start, int end, BleGattID uuid) {
+        System.out.println("primary: " + conn_handle 
                 + ", start: " + IntegralToString.intToHexString(start, true, 4)
                 + ", end: " + IntegralToString.intToHexString(end, true, 4) 
                 + ", uuid: " + uuid);
     }
 
     @Override
-    public synchronized void primaryAllEnd(String addr, int status) {
-        System.out.println("primary completed " + addr + ", " + status);
+    public synchronized void primaryAllEnd(int conn_handle, int status) {
+        System.out.println("primary completed " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public void primaryUuid(String addr, int start, int end) {
-        System.out.println("primary-uuid: " + addr 
+    public void primaryUuid(int conn_handle, int start, int end) {
+        System.out.println("primary-uuid: " + conn_handle 
                 + ", start: " + IntegralToString.intToHexString(start, true, 4)
                 + ", end: " + IntegralToString.intToHexString(end, true, 4));
     }
 
     @Override
-    public synchronized void primaryUuidEnd(String addr, int status) {
-        System.out.println("primary-uuid completed " + addr + ", " + status);
+    public synchronized void primaryUuidEnd(int conn_handle, int status) {
+        System.out.println("primary-uuid completed " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public void characteristic(String addr, int handle, short properties, int value_handle,
+    public void characteristic(int conn_handle, int handle, short properties, int value_handle,
             BleGattID uuid) {
-        System.out.println("characteristics: " + addr +
+        System.out.println("characteristics: " + conn_handle +
                 ", start: " + IntegralToString.intToHexString(handle, true, 4) +
                 ", properties: " + IntegralToString.intToHexString(properties, true, 2) +
                 ", value handle: " + IntegralToString.intToHexString(value_handle, true, 4) +
@@ -80,28 +81,28 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void characteristicEnd(String addr, int status) {
-        System.out.println("characteristic-end: " + addr + ", " + status);
+    public synchronized void characteristicEnd(int conn_handle, int status) {
+        System.out.println("characteristic-end: " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public void characteristicDescriptor(String addr, int handle, BleGattID uuid) {
-        System.out.println("characteristic-descriptor: " + addr +
+    public void characteristicDescriptor(int conn_handle, int handle, BleGattID uuid) {
+        System.out.println("characteristic-descriptor: " + conn_handle +
                 ", start: " + IntegralToString.intToHexString(handle, true, 4) +
                 ", uuid: " + uuid);
 
     }
 
     @Override
-    public synchronized void characteristicDescriptorEnd(String addr, int status) {
-        System.out.println("characteristic-descriptor-end: " + addr + ", " + status);
+    public synchronized void characteristicDescriptorEnd(int conn_handle, int status) {
+        System.out.println("characteristic-descriptor-end: " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void gotValueByHandle(String addr, byte[] value, int status) {
-        System.out.println("gotValueByHandle: " + addr + ", " + status);
+    public synchronized void gotValueByHandle(int conn_handle, byte[] value, int status) {
+        System.out.println("gotValueByHandle: " + conn_handle + ", " + status);
         if (status == 0 && value != null) {
             for (int i = 0; i < value.length; i++)
                 System.out.print(GattToolWrapper.toSignedByteString(value[i]) + " ");
@@ -111,8 +112,8 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public void gotValueByUuid(String addr, int handle, byte[] value) {
-        System.out.print("gotValueByUuid: " + addr 
+    public void gotValueByUuid(int conn_handle, int handle, byte[] value) {
+        System.out.print("gotValueByUuid: " + conn_handle 
                 + ", handle: " + IntegralToString.intToHexString(handle, true, 4) 
                 + ", value: ");
         if (value != null) {
@@ -123,32 +124,32 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void gotValueByUuidEnd(String addr, int status) {
-        System.out.println("gotValueByUuid-end: " + addr + ", status: " + status);
+    public synchronized void gotValueByUuidEnd(int conn_handle, int status) {
+        System.out.println("gotValueByUuid-end: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
 
     @Override
-    public void gotWriteResult(String addr, int status) {
-        System.out.println("gotWriteResult: " + addr + ", status: " + status);
+    public void gotWriteResult(int conn_handle, int status) {
+        System.out.println("gotWriteResult: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void gotSecurityLevelResult(String addr, int status) {
-        System.out.println("gotSecurityLevelResult: " + addr + ", status: " + status);
+    public synchronized void gotSecurityLevelResult(int conn_handle, int status) {
+        System.out.println("gotSecurityLevelResult: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void gotMtuResult(String addr, int status) {
-        System.out.println("gotMtuResult: " + addr + ", status: " + status);
+    public synchronized void gotMtuResult(int conn_handle, int status) {
+        System.out.println("gotMtuResult: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
     
     @Override
-    public synchronized void gotPsmResult(String addr, int psm) {
-        System.out.println("gotPsmResult: " + addr + ", psm: " + psm);
+    public synchronized void gotPsmResult(int psm) {
+        System.out.println("gotPsmResult: " + ", psm: " + psm);
         this.notifyAll();
     }
 

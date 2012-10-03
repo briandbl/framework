@@ -85,8 +85,8 @@ public class Response implements Cloneable{
 
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, 
-                String address, int handle, byte[] val) {
-            listener.onIndication(address, handle, val);
+                int conn_handle, int handle, byte[] val) {
+            listener.onIndication(conn_handle, handle, val);
             return true;
         }
     }
@@ -98,21 +98,38 @@ public class Response implements Cloneable{
 
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, 
-                String address, int handle, byte[] val) {
-            listener.onIndication(address, handle, val);
+                int conn_handle, int handle, byte[] val) {
+            listener.onIndication(conn_handle, handle, val);
             return true;
         }
     }
 
     public class ConnectedResponse extends GenericEndResponse{
+        private String mAddr;
         public ConnectedResponse() {
             super("CONNECTED", true);
         }
+        
+        @Override
+        protected boolean processArguments(GattToolListener listener, int handle, 
+                String args) {
+            String[] pieces = args.trim().split("\\s");
+            String addr = pieces[0];
+            int status = Integer.parseInt(pieces[1]);
+            
+            Log.v(TAG, super.mCommand + " parsed " + handle +" -> " + addr+ ", " + status);
+            
+            mListener = listener;
+            mConnHandle = handle;
+            mValue = status;
+            mAddr = addr;
+            return true;
+        }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int connHandle,
                 int status) {
-            listener.connected(address, status);
+            listener.connected(mConnHandle, mAddr, status);
             return true;
         }
     }
@@ -123,8 +140,8 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            listener.disconnected(addr);
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
+            listener.disconnected(conn_handle);
             return true;
         }
     }
@@ -135,7 +152,7 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
             String[] parts = args.split("\\s+");
             if (parts.length < 3){
                 Log.e(TAG, "PRIMARY-ALL incomplete response " + args);
@@ -154,7 +171,7 @@ public class Response implements Cloneable{
             end = Integer.parseInt(parts[1], 16);
             uuid = new BleGattID(parts[2]);
             Log.v(TAG, "PRIMARY-ALL start " + start + ", end " + end + ", uuid " + uuid);
-            listener.primaryAll(addr, start, end, uuid);
+            listener.primaryAll(conn_handle, start, end, uuid);
             return true;
         }
     }
@@ -165,9 +182,9 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.primaryAllEnd(address, status);
+            listener.primaryAllEnd(conn_handle, status);
             return true;
         }
     }
@@ -178,7 +195,7 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
             String[] parts = args.split("\\s+");
             if (parts.length < 2){
                 Log.e(TAG, "PRIMARY-UUID incomplete response " + args);
@@ -193,7 +210,7 @@ public class Response implements Cloneable{
             start = Integer.parseInt(parts[0], 16);
             end = Integer.parseInt(parts[1], 16);
             Log.v(TAG, "PRIMARY-UUID start " + start + ", end " + end);
-            listener.primaryUuid(addr, start, end);
+            listener.primaryUuid(conn_handle, start, end);
             return true;
         }
     }
@@ -204,9 +221,9 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.primaryUuidEnd(address, status);
+            listener.primaryUuidEnd(conn_handle, status);
             return true;
         }
     }
@@ -217,7 +234,7 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
             String[] parts = args.split("\\s+");
             if (parts.length < 4){
                 Log.e(TAG, "CHAR incomplete response " + args);
@@ -237,7 +254,7 @@ public class Response implements Cloneable{
             uuid = new BleGattID(parts[3]);
             Log.v(TAG, "CHAR handle " + handle + ", properties " + properties + 
                     ", value_handle " + value_handle + ", uuid " + uuid);
-            listener.characteristic(addr, handle, properties, value_handle, uuid);
+            listener.characteristic(conn_handle, handle, properties, value_handle, uuid);
             return true;
         }
     }
@@ -248,9 +265,9 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.characteristicEnd(address, status);
+            listener.characteristicEnd(conn_handle, status);
             return false;
         }
     }
@@ -261,7 +278,7 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
             String[] parts = args.split("\\s+");
             if (parts.length < 2){
                 Log.e(TAG, "CHAR-DESC with incomplete response " + args);
@@ -280,7 +297,7 @@ public class Response implements Cloneable{
             else
                 uuid = new BleGattID(Integer.parseInt(parts[1], 16));
             Log.v(TAG, "CHAR-DESC handle " + handle + ", uuid " + uuid);
-            listener.characteristicDescriptor(addr, handle, uuid);
+            listener.characteristicDescriptor(conn_handle, handle, uuid);
             return true;
         }
     }
@@ -291,15 +308,15 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.characteristicDescriptorEnd(address, status);
+            listener.characteristicDescriptorEnd(conn_handle, status);
             return true;
         }
     }
     
     public class CharValDescResponse extends Response{
-        private String mAddress;
+        private int mConnHandle;
         private byte[] mValue;
         private int mResult;
         private GattToolListener mListener;
@@ -311,11 +328,11 @@ public class Response implements Cloneable{
         @Override
         protected void callListener() {
             Log.v(TAG, "char-val-desc callListener");
-            mListener.gotValueByHandle(mAddress, mValue, mResult);
+            mListener.gotValueByHandle(mConnHandle, mValue, mResult);
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
             String[] parts = args.split("\\s+");
             if (parts.length < 1) {
                 Log.e(TAG, "CHAR-VAL-DESC without status");
@@ -331,7 +348,7 @@ public class Response implements Cloneable{
                 val[i-1] = GattToolWrapper.parseSignedByte(parts[i]);
             
             Log.v(TAG, "CHAR-VAL-DESC " + val);
-            this.mAddress = addr;
+            this.mConnHandle = conn_handle;
             this.mValue = val;
             this.mResult = Integer.parseInt(parts[0]);
             this.mListener = listener;
@@ -345,7 +362,7 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean processArguments(GattToolListener listener, String addr, String args) {
+        protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
             String[] parts = args.split("\\s+");
             if (parts.length < 1){
                 Log.e(TAG, "CHAR-READ-UUID with no handle");
@@ -362,7 +379,7 @@ public class Response implements Cloneable{
                 val[i] = GattToolWrapper.parseSignedByte(parts[1+i]);
             
             Log.v(TAG, "CHAR-READ-UUID handle " + handle + ", value "+ val);
-            listener.gotValueByUuid(addr, handle, val);
+            listener.gotValueByUuid(conn_handle, handle, val);
             return true;
         }
     }
@@ -373,9 +390,9 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotValueByUuidEnd(address, status);
+            listener.gotValueByUuidEnd(conn_handle, status);
             return true;
         }
     }
@@ -386,9 +403,9 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotWriteResult(address, status);
+            listener.gotWriteResult(conn_handle, status);
             return true;
         }
     }
@@ -399,9 +416,9 @@ public class Response implements Cloneable{
         }
 
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotSecurityLevelResult(address, status);
+            listener.gotSecurityLevelResult(conn_handle, status);
             return true;
         }
     }
@@ -412,16 +429,14 @@ public class Response implements Cloneable{
         }
         
         @Override
-        protected boolean internalProcessArguments(GattToolListener listener, String address,
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotMtuResult(address, status);
+            listener.gotMtuResult(conn_handle, status);
             return true;
         }
     }
     
     public class PsmResponse extends Response{
-        
-        String mAddress;
         int mValue;
         GattToolListener mListener;
         
@@ -432,17 +447,16 @@ public class Response implements Cloneable{
         @Override
         protected void callListener() {
             Log.v(TAG, "psm calllistener");
-            mListener.gotPsmResult(mAddress, mValue);
+            mListener.gotPsmResult(mValue);
         }
 
-        protected boolean processArguments(GattToolListener listener, String addr, 
+        protected boolean processArguments(GattToolListener listener, int conn_handle, 
                 String args) {
             if (!args.matches("\\d*")) {
                 Log.e(TAG, super.mCommand + " doesn't match " + args);
                 return false;
             }
             int status = Integer.parseInt(args);
-            mAddress = addr;
             mValue = status;
             mListener = listener;
             return true;
@@ -479,7 +493,7 @@ abstract class EventResponse extends Response {
     }
     
     @Override
-    protected boolean processArguments(GattToolListener listener, String addr, 
+    protected boolean processArguments(GattToolListener listener, int conn_handle, 
             String args) {
         String[] t = args.split("\\s+");
         if (t.length < 1){
@@ -491,20 +505,20 @@ abstract class EventResponse extends Response {
         byte[] value = new byte[l];
         for (int i = 1; i < t.length; i++)
             value[i-1] = GattToolWrapper.parseSignedByte(t[i]);
-        return this.internalProcessArguments(listener, addr, handler, value);
+        return this.internalProcessArguments(listener, conn_handle, handler, value);
     }
     
     protected abstract boolean internalProcessArguments(GattToolListener listener,
-            String address, int handler, byte[] val);
+            int conn_handle, int handler, byte[] val);
 }
 
 abstract class GenericEndResponse extends Response {
-    private static final Pattern RESULT = Pattern.compile("\\s*(\\d*)\\s*(.*)"); 
+    protected static final Pattern RESULT = Pattern.compile("\\s*(\\d*)\\s*(.*)"); 
     //result, result str
     
-    private String mAddress;
-    private int mValue;
-    private GattToolListener mListener;
+    protected int mConnHandle;
+    protected int mValue;
+    protected GattToolListener mListener;
     
     public GenericEndResponse(String s, boolean status){
         super(s, status);
@@ -513,11 +527,11 @@ abstract class GenericEndResponse extends Response {
     @Override
     protected void callListener(){
         Log.v(TAG, mCommand + " callListener ");
-        this.internalProcessArguments(mListener, mAddress, mValue);
+        this.internalProcessArguments(mListener, mConnHandle, mValue);
     }
     
     @Override
-    protected boolean processArguments(GattToolListener listener, String addr, 
+    protected boolean processArguments(GattToolListener listener, int handle, 
             String args) {
         Matcher m = RESULT.matcher(args);
         
@@ -528,18 +542,18 @@ abstract class GenericEndResponse extends Response {
         
         int status = Integer.parseInt(m.group(1));
         
-        Log.v(TAG, super.mCommand + " parsed " + addr + ", " + status);
+        Log.v(TAG, super.mCommand + " parsed " + handle + ", " + status);
         
         if (status!=0 && m.groupCount() > 1){
             Log.e(TAG, mCommand + " error " + m.group(2));
         }
         
         mListener = listener;
-        mAddress = addr;
+        mConnHandle = handle;
         mValue = status;
         return true;
     }
     
     protected abstract boolean internalProcessArguments(GattToolListener listener,
-            String address, int status);
+            int conn_handle, int status);
 }

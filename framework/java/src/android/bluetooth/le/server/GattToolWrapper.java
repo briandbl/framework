@@ -603,26 +603,26 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     };
     
     public interface GattToolListener {
-        public void onNotification(String addr, int handle, byte[] value);
-        public void onIndication(String addr, int handle, byte[] value);
-        public void connected(String addr, int status);
-        public void disconnected(String addr);
-        public void primaryAll(String addr, int start, int end, BleGattID uuid);
-        public void primaryAllEnd(String addr, int status);
-        public void primaryUuid(String addr, int start, int end);
-        public void primaryUuidEnd(String addr, int status);
-        public void characteristic(String addr, int handle, short properties, int value_handle,
+        public void onNotification(int conn_handle, int handle, byte[] value);
+        public void onIndication(int conn_handle, int handle, byte[] value);
+        public void connected(int conn_handle, String addr, int status);
+        public void disconnected(int conn_handle);
+        public void primaryAll(int conn_handle, int start, int end, BleGattID uuid);
+        public void primaryAllEnd(int conn_handle, int status);
+        public void primaryUuid(int conn_handle, int start, int end);
+        public void primaryUuidEnd(int conn_handle, int status);
+        public void characteristic(int conn_handle, int handle, short properties, int value_handle,
                 BleGattID uuid);
-        public void characteristicEnd(String addr, int status);
-        public void characteristicDescriptor(String addr, int handle, BleGattID uuid);
-        public void characteristicDescriptorEnd(String addr, int status);
-        public void gotValueByHandle(String addr, byte[] value, int status);
-        public void gotValueByUuid(String addr, int handle, byte[] value);
-        public void gotValueByUuidEnd(String addr, int status);
-        public void gotWriteResult(String addr, int status);
-        public void gotSecurityLevelResult(String addr, int status);
-        public void gotMtuResult(String addr, int status);
-        public void gotPsmResult(String addr, int psm);
+        public void characteristicEnd(int conn_handle, int status);
+        public void characteristicDescriptor(int conn_handle, int handle, BleGattID uuid);
+        public void characteristicDescriptorEnd(int conn_handle, int status);
+        public void gotValueByHandle(int conn_handle, byte[] value, int status);
+        public void gotValueByUuid(int conn_handle, int handle, byte[] value);
+        public void gotValueByUuidEnd(int conn_handle, int status);
+        public void gotWriteResult(int conn_handle, int status);
+        public void gotSecurityLevelResult(int conn_handle, int status);
+        public void gotMtuResult(int conn_handle, int status);
+        public void gotPsmResult(int psm);
         
         public void processExit(int retcode);
         public void processStdinClosed();
