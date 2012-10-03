@@ -526,31 +526,9 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     private static final Pattern PROMPT = Pattern.compile(
             "\\[(.*){3}\\]\\[([0-9A-F\\:\\s]{17})\\]\\[(.*){2}\\]");
     private static final Pattern RESULT = Pattern.compile(
-            "([A-Z\\-]*):\\s*([0-9A-F\\:]{17})\\s*(.*)");
+            "([A-Z\\-]*)\\((\\d{4})\\):\\s*(.*)");
     private static final Pattern ERROR = Pattern.compile(
-            "ERROR\\((\\d*),(\\d*)\\):.*");
-
-    private static final String[] RESULTS = new String[]{
-        "NOTIFICATION",
-        "INDICATION",
-        "CONNECTED",
-        "DISCONNECTED",
-        "PRIMARY-ALL",
-        "PRIMARY-ALL-END",
-        "PRIMARY-UUID",
-        "PRIMARY-UUID-END",
-        "CHAR",
-        "CHAR-END",
-        "CHAR-DESC",
-        "CHAR-DESC-END",
-        "CHAR-VAL-DESC",
-        "CHAR-VAL-DESC-END",
-        "CHAR-READ-UUID",
-        "CHAR-READ-UUID-END",
-        "CHAR-WRITE",
-        "SEC-LEVEL",
-        "MTU",
-    };
+            "ERROR\\((\\d{4}))\\).*:.*\\((\\d*),(\\d*)\\):.*");
 
     private static final Vector<String> END_COMMAND_RESULTS = new Vector<String>();
     
@@ -601,25 +579,20 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         
         if (m != null && m.find()){
             Log.v(TAG, "RESULT match");
-            String command, address, argument;
+            String command, argument;
+            int handle;
             command = m.group(1);
-            address = m.group(2);
+            handle = Integer.parseInt(m.group(2), 16);
             argument = m.group(3);
             
-            Log.v(TAG, "RESULT: " + command + ", " + address + ", " + argument);
+            Log.v(TAG, "RESULT: " + command + ", " + handle + ", " + argument);
             
             if (mListener == null) {
                 Log.v(TAG, "parsed a command, but no one is listening, dropping");
                 return;
             }
             
-            if (mLastAddress != null && !address.equals(mLastAddress) && mStatus != STATUS.SET_PSM) {
-                Log.e(TAG, "address changed since we got last prompt");
-                mListener.shellError(SHELL_ERRORS.ADDRESS_CHANGED);
-                //return;
-            }
-            
-            if (Response.processLine(this, this.mListener, command, address, argument))
+            if (Response.processLine(this, this.mListener, command, handle, argument))
                 return;
         }
         m = ERROR.matcher(line);

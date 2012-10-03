@@ -37,7 +37,7 @@ public class Response implements Cloneable{
         return mChangeStatus;
     }
     
-    protected boolean processArguments(GattToolListener listener, String addr, String args){
+    protected boolean processArguments(GattToolListener listener, int handle, String args){
         return false;
     }
     
@@ -47,7 +47,7 @@ public class Response implements Cloneable{
     }
     
     public static boolean processLine(GattToolWrapper w, GattToolListener listener, 
-            String command, String address, String argument){
+            String command, int handle, String argument){
         Log.v(TAG, "Processing command: " + command);
         
         if (!sCommands.containsKey(command))
@@ -55,7 +55,7 @@ public class Response implements Cloneable{
         
         argument = argument.trim();
         
-        Log.v(TAG, "addr: " + address + ", " + argument);
+        Log.v(TAG, "handle: " + handle + ", " + argument);
         Response cmd;
         try {
             cmd = (Response)sCommands.get(command).clone();
@@ -63,7 +63,7 @@ public class Response implements Cloneable{
             Log.e(TAG, "error cloning command!!!", e);
             return false;
         }
-        boolean ret = cmd.processArguments(listener, address, argument);
+        boolean ret = cmd.processArguments(listener, handle, argument);
         
         if (ret && cmd.doesStatusChange())
         {
