@@ -1,0 +1,8 @@
+
+# set this line to the place where you are storing the testing framework
+export CLASSPATH="/sdcard/btle-framework.jar"
+
+/system/bin/app_process \
+    /system/bin \
+        --nice-name=btle-framework \
+        android.bluetooth.le.server.test.GattToolWrapperTester $@
