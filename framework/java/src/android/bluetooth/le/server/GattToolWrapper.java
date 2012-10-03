@@ -68,6 +68,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         CHARACTERISTIC_WRITE_CMD,
         SET_SEC_LEVEL,
         SET_MTU,
+        SET_PSM
     };
     
     private STATUS mStatus = STATUS.IDLE;
@@ -165,11 +166,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     
     public synchronized boolean connect(String address, String address_type){
         if (mStatus != STATUS.IDLE){
-            Log.e(TAG, "connect on connected worker");
+            Log.e(TAG, "connect on connected worker " + mStatus);
             return false;
         }
         
         mStatus = STATUS.CONNECTING;
+        Log.v(TAG, "new status: " + mStatus);
         return sendCommand("connect " + address + " " + address_type);
     }
     
@@ -184,7 +186,51 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         }
         
         mStatus = STATUS.DISCONNECTING;
+        Log.v(TAG, "new status: " + mStatus);
         return sendCommand("disconnect");
+    }
+    
+    public synchronized boolean psm(int psm){
+        if (mStatus != STATUS.IDLE){
+            Log.e(TAG, "PSM can only be set while idle");
+            return false;
+        }
+        
+        mStatus = STATUS.SET_PSM;
+        Log.v(TAG, "new status: " + mStatus);
+        return sendCommand("psm " + psm);
+    }
+    
+    public synchronized boolean mtu(int mtu){
+        if (mStatus != STATUS.CONNECTED){
+            Log.e(TAG, "MTU can only be set while connected");
+            return false;
+        }
+        
+        mStatus = STATUS.SET_MTU;
+        Log.v(TAG, "new status: " + mStatus);
+        return sendCommand("mtu " + mtu);
+    }
+    
+    public enum SEC_LEVEL {
+        LOW,
+        MEDIUM,
+        HIGH
+    };
+    
+    public synchronized boolean secLevel(SEC_LEVEL level){
+        if (mStatus != STATUS.CONNECTED){
+            Log.e(TAG, "MTU can only be set while connected");
+            return false;
+        }
+        
+        mStatus = STATUS.SET_MTU;
+        Log.v(TAG, "new status: " + mStatus);
+        return sendCommand("sec-level " + level.toString().toLowerCase());
+    }
+    
+    public synchronized boolean secLevel(String l){
+        return secLevel(SEC_LEVEL.valueOf(l));
     }
     
     public synchronized boolean primaryDiscovery(){
@@ -199,6 +245,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         }
         
         mStatus = STATUS.PRIMARY_DISCOVERY;
+        Log.v(TAG, "new status: " + mStatus);
         return sendCommand("primary");
     }
     
@@ -214,18 +261,215 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         }
         
         mStatus = STATUS.PRIMARY_DISCOVERY_UUID;
-                
+        Log.v(TAG, "new status: " + mStatus);
         return sendCommand("primary " + uuid.toString());
+    }
+    
+    public synchronized boolean characteristicsDiscovery(){
+        return this.characteristicsDiscovery(null, null, null);
+    }
+    
+    public synchronized boolean characteristicsDiscovery(Integer start){
+        return this.characteristicsDiscovery(start, null, null);
+    }
+    
+    public synchronized boolean characteristicsDiscovery(Integer start, Integer end){
+        return this.characteristicsDiscovery(start, end, null);
+    }
+    
+    public synchronized boolean characteristicsDiscovery(Integer start, Integer end, BleGattID uuid){
+        if (mStatus == STATUS.IDLE){
+            Log.e(TAG, "not connected");
+            return false;
+        }
+        
+        if (mStatus != STATUS.CONNECTED){
+            Log.v(TAG, "a command is running can't start characteristics discovery");
+            return false;
+        }
+        
+        String args = "";
+        
+        if (start != null){
+            args+=IntegralToString.intToHexString(start, true, 4);
+            if (end != null) {
+                args += " " + IntegralToString.intToHexString(end, true, 4);
+                if (uuid != null)
+                    args += " " + uuid;
+            }
+        }
+        
+        mStatus = STATUS.CHARACTERISTICS_DISCOVERY;
+        Log.v(TAG, "new status: " + mStatus);
+        
+        return sendCommand("characteristics " + args);
+    }
+    
+    public synchronized boolean characteristicsDescriptorDiscovery(){
+        return characteristicsDescriptorDiscovery(null, null);
+    }
+    
+    public synchronized boolean characteristicsDescriptorDiscovery(Integer start){
+        return characteristicsDescriptorDiscovery(start);
+    }
+    
+    public synchronized boolean characteristicsDescriptorDiscovery(Integer start, Integer end){
+        if (mStatus == STATUS.IDLE){
+            Log.e(TAG, "not connected");
+            return false;
+        }
+        
+        if (mStatus != STATUS.CONNECTED){
+            Log.v(TAG, "a command is running can't start characteristics descriptor discovery");
+            return false;
+        }
+        
+        String args = "";
+        
+        if (start != null){
+            args += IntegralToString.intToHexString(start, true, 4);
+            if (end != null) {
+                args += " " + IntegralToString.intToHexString(end, true, 4);
+            }
+        }
+        
+        mStatus = STATUS.CHARACTERISTICS_DESCRIPTOR_DISCOVERY;
+        Log.v(TAG, "new status: " + mStatus);
+        
+        return sendCommand("char-desc " + args);
+    }
+    
+    public synchronized boolean readCharacteristicByHandle(int handle){
+        return this.readCharacteristicByHandle(handle, null);
+    }
+    
+    public synchronized boolean readCharacteristicByHandle(int handle, Integer offset){
+        if (mStatus == STATUS.IDLE){
+            Log.e(TAG, "not connected");
+            return false;
+        }
+        
+        if (mStatus != STATUS.CONNECTED){
+            Log.v(TAG, "a command is running can't start char read by handle");
+            return false;
+        }
+        
+        String args = "";
+        
+        if (offset != null)
+            args += IntegralToString.intToHexString(offset, true, 4);
+        
+        mStatus = STATUS.CHARACTERISTICS_READ_HANDLE;
+        Log.v(TAG, "new status: " + mStatus);
+        
+        return sendCommand("char-read-hnd" 
+                + " " + IntegralToString.intToHexString(handle, true, 4) 
+                + " " + args);
+    }
+   
+    public synchronized boolean readCharacteristicByUUID(BleGattID uuid, Integer start){
+        return this.readCharacteristicByUUID(uuid, start, null);
+    }
+    
+    public synchronized boolean readCharacteristicByUUID(BleGattID uuid, Integer start, Integer end){
+        if (mStatus == STATUS.IDLE){
+            Log.e(TAG, "not connected");
+            return false;
+        }
+        
+        if (mStatus != STATUS.CONNECTED){
+            Log.v(TAG, "a command is running can't start char read by uuid");
+            return false;
+        }
+        
+        String args = "";
+        
+        if (start != null){
+            args += IntegralToString.intToHexString(start, true, 4);
+            if (end != null)
+                args += " " + IntegralToString.intToHexString(end, true, 4);
+        }
+        mStatus = STATUS.CHARACTERISTICS_READ_UUID;
+        Log.v(TAG, "new status: " + mStatus);
+        
+        return sendCommand("char-read-uuid " + uuid + " " + args);
+    }
+    
+    public static int toSignedByte(byte val){
+        return ((int)val) & 0xff;
+    }
+    
+    public static String toSignedByteString(byte val){
+        return IntegralToString.intToHexString(toSignedByte(val), false, 2);
+    }
+    
+    public static byte parseSignedByte(String v){
+        return (byte)(Integer.parseInt(v, 16) & 0xff);
+    }
+    
+    public synchronized boolean writeCharReq(int handle, byte[] val){
+        if (mStatus == STATUS.IDLE){
+            Log.e(TAG, "not connected");
+            return false;
+        }
+        
+        if (mStatus != STATUS.CONNECTED){
+            Log.e(TAG, "a command is running can't start write char req");
+            return false;
+        }
+        
+        if (val == null || val.length == 0) {
+            Log.e(TAG, "you need to pass a value to write");
+            return false;
+        }
+        
+        String args = "";
+        
+        for (int i = 0; i < val.length ; i++)
+            args+= toSignedByteString(val[i]) + " ";
+        
+        mStatus = STATUS.CHARACTERISTIC_WRITE_REQ;
+        Log.v(TAG, "new status: " + mStatus);
+        
+        return sendCommand("char-write-req " + Integer.toHexString(handle) + " " + args);
+    }
+    
+    public synchronized boolean writeCharCmd(int handle, byte[] val){
+        if (mStatus == STATUS.IDLE){
+            Log.e(TAG, "not connected");
+            return false;
+        }
+        
+        if (mStatus != STATUS.CONNECTED){
+            Log.e(TAG, "a command is running can't start write char req");
+            return false;
+        }
+        
+        if (val == null || val.length == 0) {
+            Log.e(TAG, "you need to pass a value to write");
+            return false;
+        }
+        
+        String args = "";
+        
+        for (int i = 0; i < val.length ; i++)
+            args+= toSignedByteString(val[i]) + " ";
+        
+        mStatus = STATUS.CHARACTERISTIC_WRITE_CMD;
+        Log.v(TAG, "new status: " + mStatus);
+        
+        return sendCommand("char-write-cmd " + Integer.toHexString(handle) + " " + args);
     }
 
     private static final String TOOL = "/system/bin/gatttool-btle";
     public static String TAG = "GATTTOOL";
 
     public GattToolWrapper() throws IOException {
-        mProcess = new ProcessBuilder(TOOL + " -I").redirectErrorStream(true).start();
+        mProcess = new ProcessBuilder(TOOL, "-I").redirectErrorStream(true).start();
         mInput = new DataInputStream(mProcess.getInputStream());
         mOutput = new DataOutputStream(mProcess.getOutputStream());
         mWorker = new Worker(mInput, this);
+        mWorker.start();
         mBusy = false;
     }
     
@@ -280,7 +524,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     }
 
     private static final Pattern PROMPT = Pattern.compile(
-            "\\[([^\\]]{3})\\]\\[([0-9A-F\\:\\s]{17})\\]\\[(\\S{2})\\]");
+            "\\[(.*){3}\\]\\[([0-9A-F\\:\\s]{17})\\]\\[(.*){2}\\]");
     private static final Pattern RESULT = Pattern.compile(
             "([A-Z\\-]*):\\s*([0-9A-F\\:]{17})\\s*(.*)");
     private static final Pattern ERROR = Pattern.compile(
@@ -318,60 +562,65 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         END_COMMAND_RESULTS.add("CHAR-READ-UUID-END");
         END_COMMAND_RESULTS.add("CHAR-WRITE");
         END_COMMAND_RESULTS.add("SEC-LEVEL");
-        END_COMMAND_RESULTS.add("MTU");   
+        END_COMMAND_RESULTS.add("MTU");
+        END_COMMAND_RESULTS.add("PSM");
     }
 
     
     private String mLastAddress = null;
+    
+    public synchronized void endCommand(){
+        Log.v(TAG, "updating status, previous: " + mStatus);
+
+        if (mStatus != STATUS.SET_PSM)
+            mStatus = STATUS.CONNECTED;
+        else
+            mStatus = STATUS.IDLE;
+
+        Log.v(TAG, "new status: " + mStatus);
+    }
 
     @Override
     public void lineReceived(String line) {
         Log.v(TAG, "lineReceived " + line);
+        
         Matcher m;
         m = PROMPT.matcher(line);
-        if (m != null) {
+  
+        if (m != null && m.find()) {
+            Log.v(TAG, "prompt match");
             String state, address, type;
             state = m.group(1);
             address = m.group(2);
             type = m.group(3);
             Log.i(TAG, "found prompt " + state + ", " + address + ", " + type);
             mLastAddress = address;
-            synchronized (this){
-                if (state=="CON" && mStatus == STATUS.IDLE)
-                    this.mStatus = STATUS.CONNECTED;
-                if (state.trim().length()==0 && mStatus != STATUS.IDLE)
-                    this.mStatus = STATUS.IDLE;
-            }
             return;
         }
         m = RESULT.matcher(line);
         
-        if (m != null){
+        if (m != null && m.find()){
+            Log.v(TAG, "RESULT match");
             String command, address, argument;
             command = m.group(1);
             address = m.group(2);
             argument = m.group(3);
+            
+            Log.v(TAG, "RESULT: " + command + ", " + address + ", " + argument);
             
             if (mListener == null) {
                 Log.v(TAG, "parsed a command, but no one is listening, dropping");
                 return;
             }
             
-            if (!address.equals(mLastAddress)) {
+            if (mLastAddress != null && !address.equals(mLastAddress) && mStatus != STATUS.SET_PSM) {
                 Log.e(TAG, "address changed since we got last prompt");
                 mListener.shellError(SHELL_ERRORS.ADDRESS_CHANGED);
-                return;
+                //return;
             }
             
-            if (Response.processLine(this.mListener, command, address, argument)){
-                if (END_COMMAND_RESULTS.contains(command))
-                {
-                    synchronized (this){
-                        mStatus = STATUS.CONNECTED;
-                    }
-                }
+            if (Response.processLine(this, this.mListener, command, address, argument))
                 return;
-            }
         }
         m = ERROR.matcher(line);
     }
@@ -395,11 +644,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         public void characteristicDescriptor(String addr, int handle, BleGattID uuid);
         public void characteristicDescriptorEnd(String addr, int status);
         public void gotValueByHandle(String addr, byte[] value, int status);
-        public void gotValueByUuid(String addr, BleGattID uuid, byte[] value);
+        public void gotValueByUuid(String addr, int handle, byte[] value);
         public void gotValueByUuidEnd(String addr, int status);
         public void gotWriteResult(String addr, int status);
         public void gotSecurityLevelResult(String addr, int status);
         public void gotMtuResult(String addr, int status);
+        public void gotPsmResult(String addr, int psm);
         
         public void processExit(int retcode);
         public void processStdinClosed();

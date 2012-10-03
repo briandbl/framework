@@ -11,31 +11,42 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Response {
+public class Response implements Cloneable{
     protected static String TAG = GattToolWrapper.TAG;
     
     private static Map<String, Response> sCommands = new HashMap<String, Response>();
     
     protected String mCommand;
+    protected boolean mChangeStatus;
     
     private Response(){
         Log.v(TAG, "initializing reponse listeners");
     }
     
-    public Response(String c){
+    public Response(String c, boolean status){
         Log.v(TAG, "registering " + c);
         if (sCommands.containsKey(c))
             Log.e(TAG, "replacing listener " + c);
         
         sCommands.put(c, this);
         mCommand = c;
+        mChangeStatus = status;
+    }
+    
+    protected boolean doesStatusChange(){
+        return mChangeStatus;
     }
     
     protected boolean processArguments(GattToolListener listener, String addr, String args){
         return false;
     }
     
-    public static boolean processLine(GattToolListener listener, 
+    protected void callListener(){
+        // will only get called on classes with doesStatusChange() == true
+        Log.e(TAG, "callListener not implemented");
+    }
+    
+    public static boolean processLine(GattToolWrapper w, GattToolListener listener, 
             String command, String address, String argument){
         Log.v(TAG, "Processing command: " + command);
         
@@ -45,8 +56,22 @@ public class Response {
         argument = argument.trim();
         
         Log.v(TAG, "addr: " + address + ", " + argument);
-        Response cmd = sCommands.get(command);
-        return cmd.processArguments(listener, address, argument);
+        Response cmd;
+        try {
+            cmd = (Response)sCommands.get(command).clone();
+        } catch (CloneNotSupportedException e) {
+            Log.e(TAG, "error cloning command!!!", e);
+            return false;
+        }
+        boolean ret = cmd.processArguments(listener, address, argument);
+        
+        if (ret && cmd.doesStatusChange())
+        {
+            w.endCommand();
+            cmd.callListener();
+        }
+        
+        return ret;
     }
     
     static {
@@ -81,7 +106,7 @@ public class Response {
 
     public class ConnectedResponse extends GenericEndResponse{
         public ConnectedResponse() {
-            super("CONNECTED");
+            super("CONNECTED", true);
         }
 
         @Override
@@ -94,7 +119,7 @@ public class Response {
     
     public class DisconnectedResponse extends Response{
         public DisconnectedResponse() {
-            super("DISCONNECTED");
+            super("DISCONNECTED", true);
         }
 
         @Override
@@ -106,19 +131,21 @@ public class Response {
     
     public class PrimaryAllResponse extends Response{
         public PrimaryAllResponse() {
-            super("PRIMARY-ALL");
+            super("PRIMARY-ALL", false);
         }
 
         @Override
         protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            String[] parts = args.split("\\s*");
+            String[] parts = args.split("\\s+");
             if (parts.length < 3){
                 Log.e(TAG, "PRIMARY-ALL incomplete response " + args);
                 return false;
             }
             
             if (parts.length > 3){
-                Log.w(TAG, "PRIMARY-ALL with extra arguments " + args);
+                Log.w(TAG, "PRIMARY-ALL with extra arguments " + args + " " + parts.length);
+                for (String p: parts)
+                    Log.v(TAG, p);
             }
             
             int start, end;
@@ -134,7 +161,7 @@ public class Response {
     
     public class PrimaryAllEndResponse extends GenericEndResponse{
         public PrimaryAllEndResponse() {
-            super("PRIMARY-ALL-END");
+            super("PRIMARY-ALL-END", true);
         }
 
         @Override
@@ -147,12 +174,12 @@ public class Response {
     
     public class PrimaryUuidResponse extends Response{
         public PrimaryUuidResponse() {
-            super("PRIMARY-UUID");
+            super("PRIMARY-UUID", false);
         }
 
         @Override
         protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            String[] parts = args.split("\\s*");
+            String[] parts = args.split("\\s+");
             if (parts.length < 2){
                 Log.e(TAG, "PRIMARY-UUID incomplete response " + args);
                 return false;
@@ -173,7 +200,7 @@ public class Response {
     
     public class PrimaryUuidEndResponse extends GenericEndResponse{
         public PrimaryUuidEndResponse() {
-            super("PRIMARY-UUID-END");
+            super("PRIMARY-UUID-END", true);
         }
 
         @Override
@@ -186,12 +213,12 @@ public class Response {
     
     public class CharResponse extends Response{
         public CharResponse() {
-            super("CHAR");
+            super("CHAR", false);
         }
 
         @Override
         protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            String[] parts = args.split("\\s*");
+            String[] parts = args.split("\\s+");
             if (parts.length < 4){
                 Log.e(TAG, "CHAR incomplete response " + args);
                 return false;
@@ -205,7 +232,7 @@ public class Response {
             byte properties;
             BleGattID uuid;
             handle = Integer.parseInt(parts[0], 16);
-            properties = Byte.parseByte(parts[1], 16);
+            properties = GattToolWrapper.parseSignedByte(parts[1]);
             value_handle = Integer.parseInt(parts[2], 16);
             uuid = new BleGattID(parts[3]);
             Log.v(TAG, "CHAR handle " + handle + ", properties " + properties + 
@@ -217,7 +244,7 @@ public class Response {
     
     public class CharEndResponse extends GenericEndResponse{
         public CharEndResponse() {
-            super("CHAR-END");
+            super("CHAR-END", true);
         }
 
         @Override
@@ -230,12 +257,12 @@ public class Response {
     
     public class CharDescResponse extends Response{
         public CharDescResponse() {
-            super("CHAR-DESC");
+            super("CHAR-DESC", false);
         }
 
         @Override
         protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            String[] parts = args.split("\\s*");
+            String[] parts = args.split("\\s+");
             if (parts.length < 2){
                 Log.e(TAG, "CHAR-DESC with incomplete response " + args);
                 return false;
@@ -248,7 +275,10 @@ public class Response {
             int handle;
             BleGattID uuid;
             handle = Integer.parseInt(parts[0], 16);
-            uuid = new BleGattID(parts[1]);
+            if (parts[1].length() > 4)
+                uuid = new BleGattID(parts[1]);
+            else
+                uuid = new BleGattID(Integer.parseInt(parts[1], 16));
             Log.v(TAG, "CHAR-DESC handle " + handle + ", uuid " + uuid);
             listener.characteristicDescriptor(addr, handle, uuid);
             return true;
@@ -257,7 +287,7 @@ public class Response {
     
     public class CharDescEndResponse extends GenericEndResponse{
         public CharDescEndResponse() {
-            super("CHAR-DESC-END");
+            super("CHAR-DESC-END", true);
         }
 
         @Override
@@ -269,13 +299,24 @@ public class Response {
     }
     
     public class CharValDescResponse extends Response{
+        private String mAddress;
+        private byte[] mValue;
+        private int mResult;
+        private GattToolListener mListener;
+        
         public CharValDescResponse() {
-            super("CHAR-VAL-DESC");
+            super("CHAR-VAL-DESC", true);
+        }
+        
+        @Override
+        protected void callListener() {
+            Log.v(TAG, "char-val-desc callListener");
+            mListener.gotValueByHandle(mAddress, mValue, mResult);
         }
 
         @Override
         protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            String[] parts = args.split("\\s*");
+            String[] parts = args.split("\\s+");
             if (parts.length < 1) {
                 Log.e(TAG, "CHAR-VAL-DESC without status");
                 return false;
@@ -286,23 +327,26 @@ public class Response {
             
             byte[] val = new byte[parts.length-1];
             
-            for (int i = 1; i < val.length ; i++)
-                val[i-1] = Byte.parseByte(parts[i], 16);
+            for (int i = 1; i < parts.length ; i++)
+                val[i-1] = GattToolWrapper.parseSignedByte(parts[i]);
             
             Log.v(TAG, "CHAR-VAL-DESC " + val);
-            listener.gotValueByHandle(addr, val, Integer.parseInt(parts[0]));
+            this.mAddress = addr;
+            this.mValue = val;
+            this.mResult = Integer.parseInt(parts[0]);
+            this.mListener = listener;
             return true;
         }
     }
     
     public class CharUuidResponse extends Response{
         public CharUuidResponse() {
-            super("CHAR-READ-UUID");
+            super("CHAR-READ-UUID", false);
         }
 
         @Override
         protected boolean processArguments(GattToolListener listener, String addr, String args) {
-            String[] parts = args.split("\\s*");
+            String[] parts = args.split("\\s+");
             if (parts.length < 1){
                 Log.e(TAG, "CHAR-READ-UUID with no handle");
                 return false;
@@ -310,12 +354,12 @@ public class Response {
             if (parts.length < 2)
                 Log.w(TAG, "CHAR-READ-UUID with no value, weird");
             
-            BleGattID handle = new BleGattID(Integer.parseInt(parts[0], 16));
+            int handle = Integer.parseInt(parts[0], 16);
             
             byte[] val = new byte[parts.length-1];
             
             for (int i = 0; i < val.length ; i++)
-                val[i] = Byte.parseByte(parts[1+i], 16);
+                val[i] = GattToolWrapper.parseSignedByte(parts[1+i]);
             
             Log.v(TAG, "CHAR-READ-UUID handle " + handle + ", value "+ val);
             listener.gotValueByUuid(addr, handle, val);
@@ -325,7 +369,7 @@ public class Response {
     
     public class CharUuidEndResponse extends GenericEndResponse{
         public CharUuidEndResponse() {
-            super("CHAR-READ-UUID-END");
+            super("CHAR-READ-UUID-END", true);
         }
 
         @Override
@@ -338,7 +382,7 @@ public class Response {
     
     public class CharWriteResponse extends GenericEndResponse{
         public CharWriteResponse() {
-            super("CHAR-WRITE");
+            super("CHAR-WRITE", true);
         }
 
         @Override
@@ -351,7 +395,7 @@ public class Response {
     
     public class SecLevelResponse extends GenericEndResponse{
         public SecLevelResponse() {
-            super("SEC-LEVEL");
+            super("SEC-LEVEL", true);
         }
 
         @Override
@@ -364,13 +408,43 @@ public class Response {
     
     public class MtuResponse extends GenericEndResponse{
         public MtuResponse() {
-            super("MTU");
+            super("MTU", true);
         }
         
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, String address,
                 int status) {
             listener.gotMtuResult(address, status);
+            return true;
+        }
+    }
+    
+    public class PsmResponse extends Response{
+        
+        String mAddress;
+        int mValue;
+        GattToolListener mListener;
+        
+        public PsmResponse() {
+            super("PSM", true);
+        }
+           
+        @Override
+        protected void callListener() {
+            Log.v(TAG, "psm calllistener");
+            mListener.gotPsmResult(mAddress, mValue);
+        }
+
+        protected boolean processArguments(GattToolListener listener, String addr, 
+                String args) {
+            if (!args.matches("\\d*")) {
+                Log.e(TAG, super.mCommand + " doesn't match " + args);
+                return false;
+            }
+            int status = Integer.parseInt(args);
+            mAddress = addr;
+            mValue = status;
+            mListener = listener;
             return true;
         }
     }
@@ -395,18 +469,19 @@ public class Response {
         new CharWriteResponse();
         new SecLevelResponse();
         new MtuResponse();
+        new PsmResponse();
     }
 }
 
 abstract class EventResponse extends Response {
     public EventResponse(String s){
-        super(s);
+        super(s, false);
     }
     
     @Override
     protected boolean processArguments(GattToolListener listener, String addr, 
             String args) {
-        String[] t = args.split("\\s*");
+        String[] t = args.split("\\s+");
         if (t.length < 1){
             Log.e(TAG, super.mCommand + " with missing arguments " + args);
             return false;
@@ -415,7 +490,7 @@ abstract class EventResponse extends Response {
         int l = t.length-1;
         byte[] value = new byte[l];
         for (int i = 1; i < t.length; i++)
-            value[i-1] = Byte.valueOf(t[i], 16);
+            value[i-1] = GattToolWrapper.parseSignedByte(t[i]);
         return this.internalProcessArguments(listener, addr, handler, value);
     }
     
@@ -427,8 +502,18 @@ abstract class GenericEndResponse extends Response {
     private static final Pattern RESULT = Pattern.compile("\\s*(\\d*)\\s*(.*)"); 
     //result, result str
     
-    public GenericEndResponse(String s){
-        super(s);
+    private String mAddress;
+    private int mValue;
+    private GattToolListener mListener;
+    
+    public GenericEndResponse(String s, boolean status){
+        super(s, status);
+    }
+    
+    @Override
+    protected void callListener(){
+        Log.v(TAG, mCommand + " callListener ");
+        this.internalProcessArguments(mListener, mAddress, mValue);
     }
     
     @Override
@@ -436,16 +521,23 @@ abstract class GenericEndResponse extends Response {
             String args) {
         Matcher m = RESULT.matcher(args);
         
-        if (m==null){
+        if (m==null || m.find()==false){
             Log.e(TAG, super.mCommand + " doesn't match " + args);
             return false;
         }
         
         int status = Integer.parseInt(m.group(1));
+        
+        Log.v(TAG, super.mCommand + " parsed " + addr + ", " + status);
+        
         if (status!=0 && m.groupCount() > 1){
             Log.e(TAG, mCommand + " error " + m.group(2));
         }
-        return this.internalProcessArguments(listener, addr, status);
+        
+        mListener = listener;
+        mAddress = addr;
+        mValue = status;
+        return true;
     }
     
     protected abstract boolean internalProcessArguments(GattToolListener listener,
