@@ -38,8 +38,8 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void disconnected(int conn_handle) {
-        System.out.println("disconnected " + conn_handle);
+    public synchronized void disconnected(int conn_handle, String addr) {
+        System.out.println("disconnected " + conn_handle + ", " + addr);
         this.notifyAll();
     }
 

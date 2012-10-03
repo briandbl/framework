@@ -141,7 +141,7 @@ public class Response implements Cloneable{
 
         @Override
         protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
-            listener.disconnected(conn_handle);
+            listener.disconnected(conn_handle, args.trim());
             return true;
         }
     }

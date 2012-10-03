@@ -606,7 +606,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         public void onNotification(int conn_handle, int handle, byte[] value);
         public void onIndication(int conn_handle, int handle, byte[] value);
         public void connected(int conn_handle, String addr, int status);
-        public void disconnected(int conn_handle);
+        public void disconnected(int conn_handle, String addr);
         public void primaryAll(int conn_handle, int start, int end, BleGattID uuid);
         public void primaryAllEnd(int conn_handle, int status);
         public void primaryUuid(int conn_handle, int start, int end);
