@@ -21,6 +21,7 @@ import android.app.IActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.server.BlueZInterface.BlueZConnectionError;
+import android.bluetooth.le.server.GattToolWrapper.SHELL_ERRORS;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IIntentReceiver;
@@ -59,7 +60,8 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.Vector;
 
-public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface.Listener {
+public class BluetoothGatt extends IBluetoothGatt.Stub implements 
+        BlueZInterface.Listener, GattToolWrapper.GattToolListener {
     private BlueZInterface mBluezInterface;
     private BluetoothAdapter mAdapter;
     private IActivityManager mAm;
@@ -75,8 +77,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
     private byte mNextAppID = 0;
 
-    private int mNextConnID = 0;
-
+    /**
+     * this class member is used for enabling and disabling the Bluez interface depending on wheter
+     * it's running or not
+     */
     BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context c, Intent i) {
@@ -339,54 +343,155 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         int connID;
         AppWrapper wrapper;
         String remote;
+        GattToolWrapper mGattTool;
 
-        public ConnectionWrapper(int c, AppWrapper w, String r) {
-            this.connID = c;
+        public ConnectionWrapper(AppWrapper w, String r) {
+            this.connID = -1; // mark as pending
             this.wrapper = w;
             this.remote = r;
         }
     }
+    
+    private Map<String, ConnectionWrapper> mPendingConnections = 
+            new HashMap<String, ConnectionWrapper>();
 
     private Map<Integer, ConnectionWrapper> mConnectionMap = new HashMap<Integer, ConnectionWrapper>();
 
+    /* ************************************************************************************
+     * Connection handling methods
+     *************************************************************************************/
     @Override
-    public void open(byte interfaceID, final String remote, boolean foreground) {
+    public synchronized void connected(int conn_handle, String addr, int status) {
+        Log.v(TAG, "connected " + addr + " -> " + conn_handle + " " + status);
+        if (!mPendingConnections.containsKey(addr)){
+            Log.e(TAG, "remote no longer pending!");
+            return;
+        }
+        
+        ConnectionWrapper cw = mPendingConnections.get(addr);
+        mPendingConnections.remove(addr);
+        
+        cw.connID = conn_handle;
+
+        try {
+            if (status == BleConstants.GATT_SUCCESS){
+                mConnectionMap.put(conn_handle, cw);
+                cw.wrapper.mCallback.onConnected(addr, conn_handle);
+            }
+            else
+                cw.wrapper.mCallback.onDisconnected(conn_handle, addr);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed calling callback from connection wrapper", e);
+        }
+
+        this.notifyAll();
+    }
+
+    
+    
+    @Override
+    public synchronized void open(byte interfaceID, final String remote, boolean foreground) {
         Log.v(TAG, "open " + interfaceID + " " + remote);
 
         final AppWrapper w = this.registeredAppsByID[interfaceID];
-        if (mNextConnID == Integer.MAX_VALUE) {
-            Log.e(TAG, "failed to connect to: " + remote + ", out of connection IDs");
+        
+        GattToolWrapper gtw = null;
+        ConnectionWrapper cw = null;
+        
+        try {
+            gtw = GattToolWrapper.getWorker();
+            cw = new ConnectionWrapper(w, remote);
+            cw.mGattTool = gtw;
+            mPendingConnections.put(remote, cw);
+        } catch (Exception e) {
+            Log.e(TAG, "something failed while getting gatttool wrapper and connection wrapper");
             try {
                 w.mCallback.onConnected(remote, -1);
-            } catch (RemoteException e) {
-                Log.e(TAG, "we failed to notify other end", e);
+            } catch (RemoteException e2) {
+                Log.e(TAG, "we failed to notify other end", e2);
             }
             return;
         }
 
-        Thread t = new Thread() {
-            public void run() {
-                try {
-                    int conn = ++mNextConnID;
-                    mConnectionMap.put(new Integer(conn), new ConnectionWrapper(
-                            conn, w, remote));
-                    w.mCallback.onConnected(remote, conn);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "error during connection", e);
-                }
-            }
-        };
-
+        if (getDeviceType(remote) == BleAdapter.DEVICE_TYPE_BREDR){
+            Log.v(TAG, "Connecting to BR device, setting psm=31");
+            gtw.psm(31);
+        }
+        gtw.connect(remote);
+        
         if (foreground)
-            t.run();
-        else
-            t.start();
+            try {
+                this.wait();
+            } catch (InterruptedException e) { 
+            }
+    }
+    
+    @Override
+    public synchronized void disconnected(int conn_handle, String addr) {
+        Log.v(TAG, "disconnected " + addr + " -> " + conn_handle);
+        ConnectionWrapper cw;
+        if (mPendingConnections.containsKey(addr)){
+            Log.i(TAG, "disconnect on pending connection");
+            cw = mPendingConnections.get(addr);
+            mPendingConnections.remove(addr);    
+        } else if (mConnectionMap.containsKey(conn_handle)){
+            Log.i(TAG, "disconnected from real connection");
+            cw = mConnectionMap.get(addr);
+            mConnectionMap.remove(addr);
+        } else {
+            Log.e(TAG, "Address is not registered as pending or connected, aborting");
+            return;
+        }
+        
+        cw.mGattTool.releaseWorker();
+        
+        try {
+            cw.wrapper.mCallback.onDisconnected(conn_handle, addr);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed calling callback from connection wrapper", e);
+        }
+
+        this.notifyAll();
+    }
+    
+    @Override
+    public synchronized void close(final byte interfaceID, final String remote, 
+            int connHandle, boolean foreground) {
+        Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID 
+                + " connHandle " + connHandle);
+
+        ConnectionWrapper cw = null;
+        if (connHandle == 0){
+            if (mPendingConnections.containsKey(remote)){
+                cw = mPendingConnections.get(remote);
+                mPendingConnections.remove(remote);
+            }
+        } else {
+            if (mConnectionMap.containsKey(connHandle)){
+                cw = mConnectionMap.get(remote);
+                mConnectionMap.remove(remote);
+            }
+        }
+        
+        if (cw == null) {
+            Log.e(TAG, "disconnect for non pending or known connection");
+            return;
+        }
+        
+        cw.mGattTool.disconnect();
+        cw.mGattTool.releaseWorker();
+        cw.mGattTool = null;
+        if (foreground)
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                Log.e(TAG, "got interrupted while waiting for disconnection signal", e);
+            }
     }
 
-    private boolean pingClient(Binder b) {
-        return b.pingBinder();
-    }
-
+    /* *******************************************************************************
+     * Application handling methods
+     ********************************************************************************/
     @Override
     public void registerApp(BluetoothGattID appUuid, IBleClientCallback callback) {
         AppWrapper wrapper = null;
@@ -1026,51 +1131,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         return r.size() > 0;
     }
     
-    @Override
-    public void close(final byte interfaceID, final String remote, int clientID, boolean foreground) {
-        Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID + " clientID " + clientID);
-
-        for (Map.Entry<Integer, ConnectionWrapper> e: mConnectionMap.entrySet()){
-            final ConnectionWrapper cw = e.getValue();
-            if (!cw.remote.equalsIgnoreCase(remote))
-                continue;
-                
-            Log.v(TAG, "found a possible match");
-            int v = e.getKey().intValue();
-            if (v != interfaceID && v != clientID)
-                continue;
-
-            Log.v(TAG, "real match");
-
-            Thread t = new Thread() {
-                public void run() {
-                    try {
-                        mBluezInterface.getDevice(remote).Disconnect();
-                    } catch (Exception e) {
-                        Log.e(TAG, "error while disconnecting, ignoring", e);
-                    }
-
-                    try {
-                        mConnectionMap.remove(new Integer(interfaceID));
-                        cw.wrapper.mCallback.onDisconnected(interfaceID, remote);
-                    } catch (RemoteException e) {
-                        Log.e(TAG, "error during connection", e);
-                    }
-
-                    if (mNotificationListener.containsKey(remote))
-                        mNotificationListener.remove(remote);
-
-                }
-            };
-
-            if (foreground)
-                t.run();
-            else
-                t.start();
-
-            break;
-        }
-    }
+    
 
     @Override
     public void setScanParameters(int scanInterval, int scanWindow) {
@@ -1372,5 +1433,126 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements BlueZInterface
         } catch (RemoteException e) {
             Log.e(TAG, "failed notifiying", e);
         }
+    }
+
+    @Override
+    public void onNotification(int conn_handle, int handle, byte[] value) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void onIndication(int conn_handle, int handle, byte[] value) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void primaryAll(int conn_handle, int start, int end, BleGattID uuid) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void primaryAllEnd(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void primaryUuid(int conn_handle, int start, int end) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void primaryUuidEnd(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void characteristic(int conn_handle, int handle, short properties, int value_handle,
+            BleGattID uuid) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void characteristicEnd(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void characteristicDescriptor(int conn_handle, int handle, BleGattID uuid) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void characteristicDescriptorEnd(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotValueByHandle(int conn_handle, byte[] value, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotValueByUuid(int conn_handle, int handle, byte[] value) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotValueByUuidEnd(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotWriteResult(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotSecurityLevelResult(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotMtuResult(int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void gotPsmResult(int psm) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void processExit(int retcode) {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void processStdinClosed() {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public void shellError(SHELL_ERRORS e) {
+        // TODO Auto-generated method stub
+        
     }
 }
