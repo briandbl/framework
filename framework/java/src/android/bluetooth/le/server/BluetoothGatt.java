@@ -391,6 +391,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         
         public void addCharacteristic(Characteristic c){
             c.service = this;
+            c.uuid.setInstId(this.chars.size());
             this.chars.add(c);
         }
     }
@@ -916,7 +917,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * This method gets called by remote gatt client for registering a callback
      * function for service data related activities.
      */
-    public void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
+    public synchronized void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
             String address, IBleCharacteristicDataCallback callback) {
         Log.v(TAG, "registerServiceDataCallback");
        
@@ -972,9 +973,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             }
         
         try {
-            if (s.chars.size() > 0)
+            if (s.chars.size() > 0) {
                 s.callback.onGetFirstCharacteristic(connID, s.lastCharResult.intValue(), 
                         serviceID, s.chars.get(0).uuid);
+            }
             else
                 s.callback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND, 
                         serviceID, null);
@@ -988,7 +990,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * GattToolWrapper callback that gets called once per discovered characteristic.
      */
-    public void characteristic(int connID, int handle, short properties, int value_handle,
+    public synchronized void characteristic(int connID, int handle, short properties, int value_handle,
             BleGattID uuid) {
         Log.v(TAG, "got characteristic " + connID + " " + handle);
         
@@ -1016,22 +1018,38 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
     
     @Override
-    public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id) {
-        Log.v(TAG, "getNextChar");
-        Log.v(TAG, connID + ", " + svcID + ", " + id);
-        ServiceWrapper w = getServiceWrapper(connID);
-
-        if (w == null || w.mCallback == null) {
-            Log.e(TAG, "no service wrapper or no callback, can't do anything");
+    public synchronized void getNextChar(int connID, BluetoothGattCharID svcChrID, BluetoothGattID id) {
+        Log.v(TAG, "getFirstChar " + connID + " " + svcChrID + " " + id);
+        BluetoothGattID serviceID = svcChrID.getSrvcId();
+        BluetoothGattID prevChar = svcChrID.getCharId();
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstChar");
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "getFirstChar");
+        
+        if (cw==null || s==null || s.callback == null){
+            Log.e(TAG, "no callback access, can't read chars");
             return;
         }
-
-        BluetoothGattID gid = internalGetNextChar(connID, svcID);
+        
+        if (id!=null) {
+            Log.e(TAG, "no included services support yet sorry.");
+            try {
+                s.callback.onGetFirstIncludedService(connID, BleConstants.GATT_ERROR, serviceID, id);
+            } catch (RemoteException e) {
+                Log.e(TAG, "exception while calling onGetFirstIncludedService");
+            }
+            return;
+        }
+        
+        BleGattID gid = null;
+        if (prevChar.getInstanceID() < s.chars.size()-1){
+            gid = s.chars.get(prevChar.getInstanceID()+1).uuid;
+        }
+        
         int status = gid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
 
         try {
-            w.mCallback.onGetNextCharacteristic(connID, status,
-                    svcID.getSrvcId(), gid);
+            s.callback.onGetNextCharacteristic(connID, status, serviceID, gid);
         } catch (RemoteException e) {
             Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
                     " charID: " + gid);
@@ -1171,59 +1189,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
 
         return ser.mCharacteristics.get(service);
-    }
-
-    public void internalGetFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id) {
-        Log.v(TAG, "getFirstChar " + connID + ", " + serviceID + ", " + id);
-        ServiceWrapper w = getServiceWrapper(connID);
-        List<CharacteristicWrapper> lcw = solveCharacteristics(connID, serviceID);
-
-        int ret = BleConstants.GATT_SUCCESS;
-        BluetoothGattID out = null;
-        if (lcw == null || lcw.size() == 0) {
-            ret = BleConstants.GATT_NOT_FOUND;
-        } else {
-            CharacteristicWrapper cw = lcw.get(0);
-            String c = cw.path;
-            Log.v(TAG, "onFirstChar " + c + " " + serviceID + " " + cw.gattID);
-            out = cw.gattID;
-        }
-
-        if (w.mCallback != null) {
-            try {
-                w.mCallback.onGetFirstCharacteristic(connID, ret, serviceID, out);
-            } catch (RemoteException e) {
-                Log.e(TAG, "failed to tell other end status " + ret + " id: " + out);
-            }
-        } else {
-            Log.e(TAG, "no callback known, can't call onGetFirstCharacteristic");
-        }
-    }
-
-
-
-    private BluetoothGattID internalGetNextChar(int connID, BluetoothGattCharID svcID) {
-        if (svcID == null)
-            return null;
-
-        List<CharacteristicWrapper> l = solveCharacteristics(connID, svcID.getSrvcId());
-        if (l == null || l.size() == 0)
-            return null;
-
-        BluetoothGattID charID = svcID.getCharId();
-
-        Iterator<CharacteristicWrapper> icw = l.iterator();
-        while (icw.hasNext()) {
-            CharacteristicWrapper cw = icw.next();
-            if (charID.equals(cw.gattID)) {
-                Log.v(TAG, "found match");
-                if (icw.hasNext()) {
-                    Log.v(TAG, "has more chars");
-                    return icw.next().gattID;
-                }
-            }
-        }
-        return null;
     }
 
     @Override
