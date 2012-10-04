@@ -378,6 +378,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         BluetoothGattID uuid;
         int start;
         int end;
+        List<Characteristic> chars = new Vector<Characteristic>();
+        Integer lastCharResult = null;
         
         IBleCharacteristicDataCallback callback;
         
@@ -386,6 +388,31 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.start = s;
             this.end = e;
         }
+        
+        public void addCharacteristic(Characteristic c){
+            c.service = this;
+            this.chars.add(c);
+        }
+    }
+    
+    private class Characteristic {
+        int handle;
+        BleGattID uuid;
+        short properties;
+        int value_handle;
+        Service service;
+        List<CharacteristicDescriptor> descriptors = new Vector<CharacteristicDescriptor>();
+        
+        public Characteristic(int handle, short properties, int value_handle, BleGattID id){
+            this.handle = handle;
+            this.properties = properties;
+            this.value_handle = value_handle;
+            this.uuid = id;
+        }
+    }
+    
+    private class CharacteristicDescriptor {
+        
     }
     
     /**
@@ -399,7 +426,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         GattToolWrapper mGattTool;
         Map<BleGattID, List<Service>> services;
         BleGattID lastPrimaryUuid;
-        Integer lastResult;
+        Service lastCharacteristicDiscoveryService;
         
         public ConnectionWrapper(AppWrapper w, String r) {
             this.connID = -1; // mark as pending
@@ -407,7 +434,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.remote = r;
             this.services = new HashMap<BleGattID, List<Service>>();
             this.lastPrimaryUuid = null;
-            this.lastResult = null;
         }
     }
 
@@ -738,6 +764,19 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         this.notifyAll();
     }
 
+    private ConnectionWrapper getConnectionWrapperForConnID(int connID) {
+        return this.getConnectionWrapperForConnID(connID, "NN");
+    }
+    
+    private ConnectionWrapper getConnectionWrapperForConnID(int connID, String f) {
+        if (!mConnectionMap.containsKey(connID)) {
+            Log.e(TAG, "connection id not known on " + f);
+            return null;
+        }
+        
+        return mConnectionMap.get(connID);
+    }
+    
     /* ********************************************************************************
      * service search methods
      **********************************************************************************/
@@ -747,13 +786,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      */
     public synchronized void searchService(final int connID, final BluetoothGattID serviceID) {
         Log.v(TAG, "searchService " + connID + " " + serviceID);
-
-        if (!mConnectionMap.containsKey(connID)) {
-            Log.e(TAG, "connection id not known on search service");
-            return;
-        }
         
-        ConnectionWrapper cw = mConnectionMap.get(connID);
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "searchService");
+        if (cw == null)
+            return;
+        
         GattToolWrapper gatt = cw.mGattTool;
         
         if (gatt == null) {
@@ -769,7 +806,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             else
                 i = new BleGattID(serviceID.getUuid());
             cw.lastPrimaryUuid = i;
-            cw.lastResult = null;
             if (cw.services.containsKey(i))
                 cw.services.remove(i);
             Log.v(TAG, "searcing for uuid " + i);
@@ -787,12 +823,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * This method is a GattToolWrapper callback that let us know for a primary result
      */
     public synchronized void primaryAll(int connID, int start, int end, BleGattID uuid) {
-        if (!mConnectionMap.containsKey(connID)) {
-            Log.e(TAG, "connection id not known on primaryAll");
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryAll");
+        if (cw == null)
             return;
-        }
-        
-        ConnectionWrapper cw = mConnectionMap.get(connID);
         
         if (!cw.services.containsKey(uuid))
             cw.services.put(uuid, new Vector<Service>());
@@ -818,12 +851,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * GattToolWrapper callback to let us know the primary scan completed.
      */
     public synchronized void primaryAllEnd(int connID, int status) {
-        if (!mConnectionMap.containsKey(connID)) {
-            Log.e(TAG, "connection id not known on primaryAllEnd");
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryAllEnd");
+        if (cw == null)
             return;
-        }
         
-        ConnectionWrapper cw = mConnectionMap.get(connID);
         try {
             cw.wrapper.mCallback.onSearchCompleted(connID, status);
         } catch (Exception e) {
@@ -838,12 +869,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      */
     @Override
     public void primaryUuid(int connID, int start, int end) {
-        if (!mConnectionMap.containsKey(connID)) {
-            Log.e(TAG, "connection id not known on primaryAll");
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryUuid");
+        if (cw == null)
             return;
-        }
         
-        ConnectionWrapper cw = mConnectionMap.get(connID);
         BleGattID uuid = cw.lastPrimaryUuid;
         Log.v(TAG, "primaryUuid " + connID + ", " + start + ", " + end);
         this.primaryAll(connID, start, end, uuid);
@@ -858,21 +887,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         this.primaryAllEnd(connID, status);
     }
     
-    @Override
-    /**
-     * This method gets called by remote gatt client for registering a callback
-     * function for service data related activities.
-     */
-    public void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
-            String address, IBleCharacteristicDataCallback callback) {
-        Log.v(TAG, "registerServiceDataCallback");
-        
-        if (!mConnectionMap.containsKey(connID)) {
-            Log.e(TAG, "connection id not known on primaryAll");
-            return;
-        }
-        
-        ConnectionWrapper cw = mConnectionMap.get(connID);
+    private Service getServiceForConnIDServiceID(int connID, BluetoothGattID serviceID){
+        return getServiceForConnIDServiceID(connID, serviceID, "NN");
+    }
+    
+    private Service getServiceForConnIDServiceID(int connID, BluetoothGattID serviceID, String f){
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getServiceForConnIDServiceID for " + f);
+        if (cw == null)
+            return null;
         
         for (Entry<BleGattID, List<Service>>e: cw.services.entrySet()){
             if (!e.getKey().toString().equals(serviceID.toString()))
@@ -883,9 +905,136 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 continue;
             }
             
-            e.getValue().get(serviceID.getInstanceID()).callback = callback;
-            Log.v(TAG, "callback registered");
+            return e.getValue().get(serviceID.getInstanceID());
+        }
+        Log.v(TAG, "couldn't find ServiceWrapper in " + f);
+        return null;
+    }
+    
+    @Override
+    /**
+     * This method gets called by remote gatt client for registering a callback
+     * function for service data related activities.
+     */
+    public void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
+            String address, IBleCharacteristicDataCallback callback) {
+        Log.v(TAG, "registerServiceDataCallback");
+       
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "registerServiceDataCallback");
+        if (s==null){
+            Log.e(TAG, "can't register callback");
             return;
+        }
+        s.callback = callback;
+        Log.v(TAG, "registered succesffully");
+    }
+    
+    /* ****************************************************************************
+     * characteristics discovery methods
+     ******************************************************************************/
+    
+    @Override
+    /**
+     * This method gets called by the binder client to start a service discovery.
+     */
+    public synchronized void getFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id)
+    {
+        Log.v(TAG, "getFirstChar " + connID + " " + serviceID + " " + id);
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstChar");
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "getFirstChar");
+        if (cw==null || s==null || s.callback == null){
+            Log.e(TAG, "no callback access, can't read chars");
+            return;
+        }
+        
+        if (id!=null) {
+            Log.e(TAG, "no included services support yet sorry.");
+            try {
+                s.callback.onGetFirstIncludedService(connID, BleConstants.GATT_ERROR, serviceID, id);
+            } catch (RemoteException e) {
+                Log.e(TAG, "exception while calling onGetFirstIncludedService");
+            }
+            return;
+        }
+        
+        cw.mGattTool.characteristicsDiscovery(s.start, s.end);
+        
+        cw.lastCharacteristicDiscoveryService = s;
+        
+        s.lastCharResult = null;
+        
+        while (s.lastCharResult == null)
+            try {
+                Log.v(TAG, "waiting for lastCharResult to stop been null");
+                this.wait();
+            } catch (InterruptedException e) {
+                Log.e(TAG, "interrupted while waiting for characteristics discovery to complete", e);
+            }
+        
+        try {
+            if (s.chars.size() > 0)
+                s.callback.onGetFirstCharacteristic(connID, s.lastCharResult.intValue(), 
+                        serviceID, s.chars.get(0).uuid);
+            else
+                s.callback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND, 
+                        serviceID, null);
+            s.lastCharResult = null;
+        } catch (RemoteException e) {
+            Log.e(TAG, "error while calling onGetFirstCharacteristic", e);
+        }
+    }
+    
+    @Override
+    /**
+     * GattToolWrapper callback that gets called once per discovered characteristic.
+     */
+    public void characteristic(int connID, int handle, short properties, int value_handle,
+            BleGattID uuid) {
+        Log.v(TAG, "got characteristic " + connID + " " + handle);
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristic callback");
+        if ( cw == null || cw.lastCharacteristicDiscoveryService == null)
+            return;
+        
+        Service s = cw.lastCharacteristicDiscoveryService;
+        s.addCharacteristic(new Characteristic(handle, properties, value_handle, uuid));
+    }
+    
+    @Override
+    /**
+     * GattToolWrapper callback telling characteristic discovery completed
+     */
+    public synchronized void characteristicEnd(int connID, int status) {
+        Log.v(TAG, "characteristicEnd " + connID + " " + status);
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicEnd callback");
+        if ( cw == null || cw.lastCharacteristicDiscoveryService == null)
+            return;
+        Service s = cw.lastCharacteristicDiscoveryService;
+        s.lastCharResult = new Integer(status);
+        this.notifyAll();
+    }
+    
+    @Override
+    public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id) {
+        Log.v(TAG, "getNextChar");
+        Log.v(TAG, connID + ", " + svcID + ", " + id);
+        ServiceWrapper w = getServiceWrapper(connID);
+
+        if (w == null || w.mCallback == null) {
+            Log.e(TAG, "no service wrapper or no callback, can't do anything");
+            return;
+        }
+
+        BluetoothGattID gid = internalGetNextChar(connID, svcID);
+        int status = gid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
+
+        try {
+            w.mCallback.onGetNextCharacteristic(connID, status,
+                    svcID.getSrvcId(), gid);
+        } catch (RemoteException e) {
+            Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
+                    " charID: " + gid);
         }
     }
 
@@ -1051,11 +1200,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
     }
 
-    @Override
-    public void getFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id)
-    {
-        internalGetFirstChar(connID, serviceID, id);
-    }
+
 
     private BluetoothGattID internalGetNextChar(int connID, BluetoothGattCharID svcID) {
         if (svcID == null)
@@ -1079,29 +1224,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             }
         }
         return null;
-    }
-
-    @Override
-    public void getNextChar(int connID, BluetoothGattCharID svcID, BluetoothGattID id) {
-        Log.v(TAG, "getNextChar");
-        Log.v(TAG, connID + ", " + svcID + ", " + id);
-        ServiceWrapper w = getServiceWrapper(connID);
-
-        if (w == null || w.mCallback == null) {
-            Log.e(TAG, "no service wrapper or no callback, can't do anything");
-            return;
-        }
-
-        BluetoothGattID gid = internalGetNextChar(connID, svcID);
-        int status = gid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
-
-        try {
-            w.mCallback.onGetNextCharacteristic(connID, status,
-                    svcID.getSrvcId(), gid);
-        } catch (RemoteException e) {
-            Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
-                    " charID: " + gid);
-        }
     }
 
     @Override
@@ -1736,19 +1858,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     @Override
     public void onIndication(int conn_handle, int handle, byte[] value) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void characteristic(int conn_handle, int handle, short properties, int value_handle,
-            BleGattID uuid) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void characteristicEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
 
     }
