@@ -371,12 +371,15 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     /**
-     * internal class used for "remembering the services"
+     * internal class used for "remembering the services", only once instance of this
+     * class should be available per registered service per instance per device.
      */
     private class Service {
         BluetoothGattID uuid;
         int start;
         int end;
+        
+        IBleCharacteristicDataCallback callback;
         
         public Service(BluetoothGattID u, int s, int e){
             this.uuid = u;
@@ -854,6 +857,37 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.v(TAG, "primaryUuidEnd " + connID + ", " + status);
         this.primaryAllEnd(connID, status);
     }
+    
+    @Override
+    /**
+     * This method gets called by remote gatt client for registering a callback
+     * function for service data related activities.
+     */
+    public void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
+            String address, IBleCharacteristicDataCallback callback) {
+        Log.v(TAG, "registerServiceDataCallback");
+        
+        if (!mConnectionMap.containsKey(connID)) {
+            Log.e(TAG, "connection id not known on primaryAll");
+            return;
+        }
+        
+        ConnectionWrapper cw = mConnectionMap.get(connID);
+        
+        for (Entry<BleGattID, List<Service>>e: cw.services.entrySet()){
+            if (!e.getKey().toString().equals(serviceID.toString()))
+                continue;
+            if (e.getValue().size()<serviceID.getInstanceID()){
+                Log.e(TAG, "instanceID is bigger than known services list: " + 
+                        e.getValue().size() + ", " +serviceID.getInstanceID());
+                continue;
+            }
+            
+            e.getValue().get(serviceID.getInstanceID()).callback = callback;
+            Log.v(TAG, "callback registered");
+            return;
+        }
+    }
 
     class CharacteristicWrapper {
         BluetoothGattID gattID;
@@ -988,14 +1022,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
 
         return ser.mCharacteristics.get(service);
-    }
-
-    @Override
-    public void registerServiceDataCallback(int connID, BluetoothGattID serviceID,
-            String address, IBleCharacteristicDataCallback callback) {
-        Log.v(TAG, "registerServiceDataCallback");
-        ServiceWrapper w = getServiceWrapper(connID);
-        w.mCallback = callback;
     }
 
     public void internalGetFirstChar(int connID, BluetoothGattID serviceID, BluetoothGattID id) {
