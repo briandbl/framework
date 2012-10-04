@@ -85,6 +85,12 @@ public class BleCharacteristic extends BleAttribute
     {
         super(charID);
     }
+    
+    public BleCharacteristic(BleGattID charID, int prop)
+    {
+        super(charID);
+        this.mProp = prop;
+    }
 
     private BleGattID getBleGattId(int handle)
     {

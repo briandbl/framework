@@ -733,7 +733,7 @@ public abstract class BleClientService
 
         @Override
         public void onGetFirstCharacteristic(int connID, int status, BluetoothGattID svcId,
-                BluetoothGattID characteristicID)
+                BluetoothGattID characteristicID, int prop)
         {
             Log.d(BleClientService.TAG,
                     "onGetFirstCharacteristic " + characteristicID.toString() + " status = "
@@ -761,10 +761,10 @@ public abstract class BleClientService
                 BleCharacteristic characteristic = null;
                 if (characteristicID.getUuidType() == 16)
                     characteristic = new BleCharacteristic(new BleGattID(
-                            characteristicID.getUuid()));
+                            characteristicID.getUuid()), prop);
                 else
                     characteristic = new BleCharacteristic(new BleGattID(
-                            characteristicID.getUuid16()));
+                            characteristicID.getUuid16()), prop);
                 characteristic.setInstanceID(characteristicID.getInstanceID());
 
                 BleClientService.this.onSetCharacteristicAuthRequirement(
@@ -928,7 +928,7 @@ public abstract class BleClientService
 
         @Override
         public void onGetNextCharacteristic(int connID, int status, BluetoothGattID svcId,
-                BluetoothGattID characteristicID)
+                BluetoothGattID characteristicID, int prop)
         {
             Log.d(BleClientService.TAG,
                     "onGetNextCharacteristic status = " + status);
@@ -958,10 +958,10 @@ public abstract class BleClientService
                 BleCharacteristic characteristic = null;
                 if (characteristicID.getUuidType() == BleConstants.GATT_UUID_TYPE_128)
                     characteristic = new BleCharacteristic(new BleGattID(
-                            characteristicID.getUuid()));
+                            characteristicID.getUuid()), prop);
                 else
                     characteristic = new BleCharacteristic(new BleGattID(
-                            characteristicID.getUuid16()));
+                            characteristicID.getUuid16()), prop);
                 characteristic.setInstanceID(characteristicID.getInstanceID());
 
                 BleClientService.this.onSetCharacteristicAuthRequirement(

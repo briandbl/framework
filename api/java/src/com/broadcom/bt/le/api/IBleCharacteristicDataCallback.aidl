@@ -24,7 +24,8 @@ interface IBleCharacteristicDataCallback {
     void onGetFirstCharacteristic(int connID, 
                                   int status,
                                   in BluetoothGattID svcId,
-                                  in BluetoothGattID charId);
+                                  in BluetoothGattID charId,
+                                  int prop);
 
     void onGetFirstCharacteristicDescriptor(int connId, 
                                    int status,
@@ -35,7 +36,8 @@ interface IBleCharacteristicDataCallback {
     void onGetNextCharacteristic(int connId, 
                                  int status,
                                  in BluetoothGattID svcId, 
-                                 in BluetoothGattID charId);
+                                 in BluetoothGattID charId,
+                                 int prop);
 
     void onGetNextCharacteristicDescriptor(int connId, 
                                            int status,

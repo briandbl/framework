@@ -974,12 +974,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         
         try {
             if (s.chars.size() > 0) {
+                Characteristic c = s.chars.get(0);
                 s.callback.onGetFirstCharacteristic(connID, s.lastCharResult.intValue(), 
-                        serviceID, s.chars.get(0).uuid);
+                        serviceID, c.uuid, c.properties);
             }
             else
                 s.callback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND, 
-                        serviceID, null);
+                        serviceID, null, 0);
             s.lastCharResult = null;
         } catch (RemoteException e) {
             Log.e(TAG, "error while calling onGetFirstCharacteristic", e);
@@ -1042,14 +1043,17 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
         
         BleGattID gid = null;
+        short prop = 0;
         if (prevChar.getInstanceID() < s.chars.size()-1){
-            gid = s.chars.get(prevChar.getInstanceID()+1).uuid;
+            Characteristic c = s.chars.get(prevChar.getInstanceID()+1);
+            gid = c.uuid;
+            prop = c.properties;
         }
         
         int status = gid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
 
         try {
-            s.callback.onGetNextCharacteristic(connID, status, serviceID, gid);
+            s.callback.onGetNextCharacteristic(connID, status, serviceID, gid, prop);
         } catch (RemoteException e) {
             Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
                     " charID: " + gid);
