@@ -371,19 +371,40 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     /**
+     * internal class used for "remembering the services"
+     */
+    private class Service {
+        BluetoothGattID uuid;
+        int start;
+        int end;
+        
+        public Service(BluetoothGattID u, int s, int e){
+            this.uuid = u;
+            this.start = s;
+            this.end = e;
+        }
+    }
+    
+    /**
      * Internal class that allows to map connection ids with remote address,
      * application wrapper and gatttool instance.
      */
-    class ConnectionWrapper {
+    private class ConnectionWrapper {
         int connID;
         AppWrapper wrapper;
         String remote;
         GattToolWrapper mGattTool;
-
+        Map<BleGattID, List<Service>> services;
+        BleGattID lastPrimaryUuid;
+        Integer lastResult;
+        
         public ConnectionWrapper(AppWrapper w, String r) {
             this.connID = -1; // mark as pending
             this.wrapper = w;
             this.remote = r;
+            this.services = new HashMap<BleGattID, List<Service>>();
+            this.lastPrimaryUuid = null;
+            this.lastResult = null;
         }
     }
 
@@ -714,7 +735,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         this.notifyAll();
     }
 
+    /* ********************************************************************************
+     * service search methods
+     **********************************************************************************/
     @Override
+    /**
+     * Method called by binder clients to start a service discovery process
+     */
     public synchronized void searchService(final int connID, final BluetoothGattID serviceID) {
         Log.v(TAG, "searchService " + connID + " " + serviceID);
 
@@ -738,11 +765,94 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 i = new BleGattID(new Integer(u16));
             else
                 i = new BleGattID(serviceID.getUuid());
-            
+            cw.lastPrimaryUuid = i;
+            cw.lastResult = null;
+            if (cw.services.containsKey(i))
+                cw.services.remove(i);
+            Log.v(TAG, "searcing for uuid " + i);
             gatt.primaryDiscoveryByUUID(i);
         } else {
+            Log.v(TAG, "doing a general primary service discovery");
+            cw.lastPrimaryUuid = null;
+            cw.services.clear();
             gatt.primaryDiscovery();
         }
+    }
+    
+    @Override
+    /**
+     * This method is a GattToolWrapper callback that let us know for a primary result
+     */
+    public synchronized void primaryAll(int connID, int start, int end, BleGattID uuid) {
+        if (!mConnectionMap.containsKey(connID)) {
+            Log.e(TAG, "connection id not known on primaryAll");
+            return;
+        }
+        
+        ConnectionWrapper cw = mConnectionMap.get(connID);
+        
+        if (!cw.services.containsKey(uuid))
+            cw.services.put(uuid, new Vector<Service>());
+        
+        int sid = cw.services.get(uuid).size();
+        int u16 = uuid.getUuid16();
+        BluetoothGattID svcId;
+        if (u16 > -1)
+            svcId = new BluetoothGattID(sid, u16);
+        else
+            svcId = new BluetoothGattID(sid, uuid.getUuid());
+        Service s = new Service(svcId, start, end);
+        cw.services.get(uuid).add(s);
+        try {
+            cw.wrapper.mCallback.onSearchResult(connID, svcId);
+        } catch (Exception e) {
+            Log.e(TAG, "exception will calling onSearchResult");
+        }
+    }
+
+    @Override
+    /**
+     * GattToolWrapper callback to let us know the primary scan completed.
+     */
+    public synchronized void primaryAllEnd(int connID, int status) {
+        if (!mConnectionMap.containsKey(connID)) {
+            Log.e(TAG, "connection id not known on primaryAllEnd");
+            return;
+        }
+        
+        ConnectionWrapper cw = mConnectionMap.get(connID);
+        try {
+            cw.wrapper.mCallback.onSearchCompleted(connID, status);
+        } catch (Exception e) {
+            Log.e(TAG, "exception will calling onSearchCompleted");
+        }
+        this.notifyAll();
+    }
+
+    /**
+     * callback from GattToolWrapper that let us know we have a result
+     * from an uuid search.
+     */
+    @Override
+    public void primaryUuid(int connID, int start, int end) {
+        if (!mConnectionMap.containsKey(connID)) {
+            Log.e(TAG, "connection id not known on primaryAll");
+            return;
+        }
+        
+        ConnectionWrapper cw = mConnectionMap.get(connID);
+        BleGattID uuid = cw.lastPrimaryUuid;
+        Log.v(TAG, "primaryUuid " + connID + ", " + start + ", " + end);
+        this.primaryAll(connID, start, end, uuid);
+    }
+
+    /**
+     * callback that let us know a service search with uuid set completed.
+     */
+    @Override
+    public void primaryUuidEnd(int connID, int status) {
+        Log.v(TAG, "primaryUuidEnd " + connID + ", " + status);
+        this.primaryAllEnd(connID, status);
     }
 
     class CharacteristicWrapper {
@@ -1600,30 +1710,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     @Override
     public void onIndication(int conn_handle, int handle, byte[] value) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryAll(int conn_handle, int start, int end, BleGattID uuid) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryAllEnd(int conn_handle, int status) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryUuid(int conn_handle, int start, int end) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void primaryUuidEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
 
     }
