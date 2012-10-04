@@ -357,6 +357,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * Internal class used to wrap all the information needed to talk to binder
      * clients.
      */
+    @SuppressWarnings("unused")
     class AppWrapper {
         BluetoothGattID mGattID;
         byte mIfaceID;
@@ -374,10 +375,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * internal class used for "remembering the services", only once instance of this
      * class should be available per registered service per instance per device.
      */
+    @SuppressWarnings("unused")
     private class Service {
         BluetoothGattID uuid;
         int start;
-        int end;
+        int end = 0xffff;
         List<Characteristic> chars = new Vector<Characteristic>();
         Characteristic lastChar = null;
         Integer lastCharResult = null;
@@ -394,16 +396,21 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             c.service = this;
             c.uuid.setInstId(this.chars.size());
             this.chars.add(c);
+            if (chars.size()>1)
+                chars.get(c.uuid.getInstanceID()-1).end = c.handle-1;
         }
     }
     
+    @SuppressWarnings("unused")
     private class Characteristic {
         int handle;
         BleGattID uuid;
         short properties;
         int value_handle;
+        int end = 0xffff;
         Service service;
         Descriptor lastDescriptor;
+        Integer lastDescriptorStatus = null;
         List<Descriptor> descriptors = new Vector<Descriptor>();
         
         public Characteristic(int handle, short properties, int value_handle, BleGattID id){
@@ -414,15 +421,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
         
         public void addDescriptor(Descriptor d){
+            d.uuid.setInstanceId(this.descriptors.size());
             this.descriptors.add(d);
             d.parent = this;
         }
     }
     
+    @SuppressWarnings("unused")
     private class Descriptor {
         int handle;
         BleGattID uuid;
         Characteristic parent;
+        
+        public Descriptor(int handle, BleGattID uuid){
+            this.handle = handle;
+            this.uuid = uuid;
+        }
     }
     
     /**
@@ -967,11 +981,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             return;
         }
         
-        cw.mGattTool.characteristicsDiscovery(s.start, s.end);
-        
         cw.lastService = s;
-        
         s.lastCharResult = null;
+        s.chars.clear();
+        
+        cw.mGattTool.characteristicsDiscovery(s.start, s.end);
         
         while (s.lastCharResult == null)
             try {
@@ -1066,6 +1080,121 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         } catch (RemoteException e) {
             Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
                     " charID: " + gid);
+        }
+    }
+    
+    /* **************************************************************************************
+     * char discovery methods
+     */
+    
+    @Override
+    public void getFirstCharDescr(int connID, BluetoothGattCharID svcChrID, BluetoothGattID id) {
+        Log.v(TAG, "getFirstCharDescr " + connID + " " + svcChrID + " " + id);
+        BluetoothGattID serviceID = svcChrID.getSrvcId();
+        BluetoothGattID charID = svcChrID.getCharId();
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstCharDescr");
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "getFirstCharDescr");
+        
+        if (cw==null || s==null || s.callback == null){
+            Log.e(TAG, "no callback access, can't discover char descriptors");
+            return;
+        }
+        
+        Characteristic c = getCharacteristicFromService(s, charID, "getFirstCharDescr");
+        if (c == null)
+            return;    
+    
+        c.lastDescriptorStatus = null;
+        c.descriptors.clear();
+        cw.lastService = s;
+        s.lastChar = c;
+        c.lastDescriptor = null;
+        cw.mGattTool.characteristicsDescriptorDiscovery(c.handle, c.end);
+        
+        while (c.lastDescriptorStatus == null)
+        try {
+            this.wait();
+        } catch (InterruptedException e) {
+            Log.e(TAG, "interrupted while waiting for characteristicDescriptorDiscovery to complete");
+        }
+        
+        BleGattID uuid = null;
+        
+        if (c.descriptors.size() > 0)
+            uuid = c.descriptors.get(0).uuid;
+
+        try {
+            s.callback.onGetFirstCharacteristicDescriptor(connID, c.lastDescriptorStatus, 
+                    serviceID, charID, uuid);
+        } catch (RemoteException e) {
+            Log.e(TAG, "error while onGetFirstCharacteristicDescriptor");
+        }
+    }
+    
+    @Override
+    /**
+     * GattToolWrapper callback called for each descriptor discovered
+     */
+    public synchronized void characteristicDescriptor(int connID, int handle, BleGattID uuid) {
+        Log.v(TAG, "characteristicDescriptor " + connID + " " + handle + " " + uuid);        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstCharDescr");
+        if (cw == null) return;
+        Service s = cw.lastService;
+        if (s == null) return;
+        Characteristic c = s.lastChar;
+        if (c == null) return;
+        c.addDescriptor(new Descriptor(handle, uuid));
+        Log.v(TAG, "added char-desc");
+    }
+
+    @Override
+    /**
+     * GattToolWrapper callback called when descriptor discovery ended.
+     */
+    public synchronized void characteristicDescriptorEnd(int connID, int status) {
+        Log.v(TAG, "characteristicDescriptorEnd " + connID + " " + status);
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstCharDescr");
+        if (cw == null) return;
+        Service s = cw.lastService;
+        if (s == null) return;
+        Characteristic c = s.lastChar;
+        if (c == null) return;
+        c.lastDescriptorStatus = status;
+        this.notifyAll();
+    }
+
+    @Override
+    public void getNextCharDescr(int connID, BluetoothGattCharDescrID charDescrID,
+            BluetoothGattID id) {
+        Log.v(TAG, "getFirstCharDescr " + connID + " " + charDescrID + " " + id);
+        BluetoothGattID serviceID = charDescrID.getSrvcId();
+        BluetoothGattID charID = charDescrID.getCharId();
+        BluetoothGattID descID = charDescrID.getDescrId();
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getNextCharDescr");
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "getNextCharDescr");
+        
+        if (cw==null || s==null || s.callback == null){
+            Log.e(TAG, "no callback access, can't discover more char descriptors");
+            return;
+        }
+        
+        Characteristic c = getCharacteristicFromService(s, charID, "getFirstCharDescr");
+        if (c == null)
+            return;    
+                
+        BluetoothGattID uuid = null;
+        
+        if (c.descriptors.size() > descID.getInstanceID()+1)
+            uuid = c.descriptors.get(descID.getInstanceID()+1).uuid;
+
+        try {
+            s.callback.onGetNextCharacteristicDescriptor(connID, 
+                    uuid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR, 
+                            serviceID, charID, uuid);
+        } catch (RemoteException e) {
+            Log.e(TAG, "error while onGetNextCharacteristicDescriptor");
         }
     }
     
@@ -1312,94 +1441,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
 
         return ser.mCharacteristics.get(service);
-    }
-
-   
-
-    @Override
-    public void getFirstCharDescr(int connID, BluetoothGattCharID charID, BluetoothGattID id) {
-        Log.v(TAG, "getFirstCharDescr");
-        // BlueZ doesn't support this over DBUS yet, so it makes no sense to do
-        // any processing here.
-        ServiceWrapper w = getServiceWrapper(connID);
-
-        if (w == null || w.mCallback == null) {
-            Log.e(TAG, "no service wrapper or no callback, can't do anything");
-            return;
-        }
-
-        Log.w(TAG, "not supported");
-
-        try {
-            w.mCallback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
-                    charID.getSrvcId(), charID.getSrvcId(), null);
-        } catch (RemoteException e) {
-            Log.e(TAG, "onGetFirstCharacteristicDescriptor", e);
-        }
-
-        /*
-         * Log.v(TAG, "getFirstCharDescr " + connID + " " + charID + " " + id);
-         * ServiceWrapper w = getServiceWrapper(connID);
-         * List<CharacteristicWrapper> lcw = solveCharacteristics(connID,
-         * charID.getSrvcId()); if (lcw.size() == 0) { Log.v(TAG, "no match");
-         * w.mCallback.onGetFirstCharacteristicDescriptor(connID,
-         * BleConstants.GATT_NOT_FOUND, charID.getSrvcId(), charID.getCharId(),
-         * null); return; } CharacteristicWrapper cw = lcw.get(0); Object o =
-         * this.mBluezInterface.GetCharacteristicValue(cw.path, "Format"); if (o
-         * == null) { Log.v(TAG, "no format");
-         * w.mCallback.onGetFirstCharacteristicDescriptor(connID,
-         * BleConstants.GATT_ERROR, charID.getSrvcId(), charID.getCharId(),
-         * null); return; } Characteristic.Format fmt = (Characteristic.Format)
-         * o; Log.v(TAG, "Got format " + fmt.NameSpace + " " + fmt.Description +
-         * " " + fmt.Unit + " " + fmt.Format + " " + fmt.Exponent);
-         * w.mCallback.onGetFirstCharacteristicDescriptor(connID,
-         * BleConstants.GATT_SUCCESS, charID.getSrvcId(), charID.getSrvcId(),
-         * new BluetoothGattID(fmt.Description.intValue()));
-         */
-    }
-
-    @Override
-    public void getNextCharDescr(int connID, BluetoothGattCharDescrID charDescrID,
-            BluetoothGattID id) {
-        Log.v(TAG, "getNextCharDescr " + connID + " " + charDescrID + " " + id);
-
-        // BlueZ doesn't support this over DBUS yet, so it makes no sense to do
-        // any processing here.
-        ServiceWrapper w = getServiceWrapper(connID);
-
-        if (w == null || w.mCallback == null) {
-            Log.e(TAG, "no service wrapper or no callback, can't do anything");
-            return;
-        }
-
-        Log.w(TAG, "not supported");
-
-        try {
-            w.mCallback.onGetNextCharacteristicDescriptor(connID, BleConstants.GATT_NOT_FOUND,
-                    null,
-                    null, null);
-        } catch (RemoteException e) {
-            Log.e(TAG, "onGetNextCharacteristicDescriptor", e);
-        }
-
-        /*
-         * List<CharacteristicWrapper> lcw = solveCharacteristics(connID,
-         * charDescrID.getSrvcId()); int i = 0; for (CharacteristicWrapper cw :
-         * lcw) { if (cw.gattID.equals(charDescrID.getCharId())) break; i++; }
-         * Log.v(TAG, "char wrapper " + ++i); CharacteristicWrapper cw =
-         * lcw.get(i); Log.v(TAG, "got char wrapper"); Object o =
-         * mBluezInterface.GetCharacteristicValue(cw.path, "Format"); Log.v(TAG,
-         * " " + o); int status = i <= lcw.size() - 1 ?
-         * BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR; if (o != null) {
-         * Characteristic.Format fmt = (Characteristic.Format) o; Log.v(TAG,
-         * "getFirstCharDescr " + fmt.Description);
-         * w.mCallback.onGetNextCharacteristicDescriptor( connID, status,
-         * charDescrID.getSrvcId(), charDescrID.getCharId(), new
-         * BluetoothGattID(fmt.Description.intValue())); } else { Log.v(TAG,
-         * "getFirstCharDescr no format ");
-         * w.mCallback.onGetFirstCharacteristicDescriptor(connID, status,
-         * charDescrID.getSrvcId(), charDescrID.getCharId(), null); }
-         */
     }
 
     private CharacteristicWrapper internalCharacteristicWrapper(int connID,
@@ -1896,18 +1937,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     @Override
     public void onIndication(int conn_handle, int handle, byte[] value) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void characteristicDescriptor(int conn_handle, int handle, BleGattID uuid) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void characteristicDescriptorEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
 
     }
