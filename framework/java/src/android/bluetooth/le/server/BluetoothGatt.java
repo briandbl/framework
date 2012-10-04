@@ -79,7 +79,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
     private byte mNextAppID = 0;
 
-    private static final int GATTTOOL_POOL_SIZE = 5;
+    private static final int GATTTOOL_POOL_SIZE = 1;
 
     /**
      * this class member is used for enabling and disabling the Bluez interface
@@ -162,17 +162,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
          * 0 or no class at all BD/EDR provides: Address, Class, Icon, RSSI,
          * Name, Alias, LegacyPairing, Paired, UUIDs
          */
-        if (prop.containsKey("Icon") && prop.containsKey("LegacyPairing"))
-            return BleAdapter.DEVICE_TYPE_BREDR;
+        if (prop.containsKey("Broadcaster") || !prop.containsKey("Class"))
+            return BleAdapter.DEVICE_TYPE_BLE;
 
-        Variant c = null;
-        if (prop.containsKey("Class"))
-            c = prop.get("Class");
-
-        if (c != null && ((UInt32) c.getValue()).intValue() != 0)
-            return BleAdapter.DEVICE_TYPE_DUMO;
-
-        return BleAdapter.DEVICE_TYPE_BLE;
+        return BleAdapter.DEVICE_TYPE_BREDR;
     }
 
     @SuppressWarnings("unused")
@@ -445,6 +438,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      */
     private class ConnectionWrapper {
         int connID;
+        boolean deviceBR;
         AppWrapper wrapper;
         String remote;
         GattToolWrapper mGattTool;
@@ -458,6 +452,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.remote = r;
             this.services = new HashMap<BleGattID, List<Service>>();
             this.lastPrimaryUuid = null;
+            this.deviceBR = false;
         }
     }
 
@@ -541,6 +536,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         if (getDeviceType(remote) == BleAdapter.DEVICE_TYPE_BREDR) {
             Log.v(TAG, "Connecting to BR device, setting psm=31");
             gtw.psm(31);
+            cw.deviceBR = true;
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                Log.e(TAG, "interrupt while setting psm", e);
+            }
         }
         gtw.connect(remote);
 
@@ -756,8 +757,15 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Log.e(TAG, "no connection wrapper for this address");
             return;
         }
+        
         if (cw.mGattTool==null){
-            Log.w(TAG, "no gatttool wrapper for this address");
+            Log.e(TAG, "no gatttool wrapper for this address");
+            return;
+        }
+        
+        if (cw.deviceBR) {
+            Log.e(TAG, "device is BR can't set sec level");
+            return;
         }
         
 
@@ -788,6 +796,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         this.notifyAll();
     }
 
+    @SuppressWarnings("unused")
     private ConnectionWrapper getConnectionWrapperForConnID(int connID) {
         return this.getConnectionWrapperForConnID(connID, "NN");
     }
@@ -990,11 +999,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         while (s.lastCharResult == null)
             try {
                 Log.v(TAG, "waiting for lastCharResult to stop been null");
-                this.wait();
+                this.wait(1000);
             } catch (InterruptedException e) {
                 Log.e(TAG, "interrupted while waiting for characteristics discovery to complete", e);
             }
         
+        Log.v(TAG, "lastCharResult is no longer null");
         try {
             if (s.chars.size() > 0) {
                 Characteristic c = s.chars.get(0);
@@ -1930,62 +1940,71 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
-    public void onNotification(int conn_handle, int handle, byte[] value) {
+    public synchronized void onNotification(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "onNotification");
+        this.notifyAll();
     }
 
     @Override
-    public void onIndication(int conn_handle, int handle, byte[] value) {
+    public synchronized void onIndication(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "onIndictation");
+        this.notifyAll();
     }
 
     @Override
-    public void gotValueByUuid(int conn_handle, int handle, byte[] value) {
+    public synchronized void gotValueByUuid(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "gotValueByUuid");
+        this.notifyAll();
     }
 
     @Override
-    public void gotValueByUuidEnd(int conn_handle, int status) {
+    public synchronized void gotValueByUuidEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "gotValueByUuidEnd");
+        this.notifyAll();
     }
 
     @Override
-    public void gotWriteResult(int conn_handle, int status) {
+    public synchronized void gotWriteResult(int conn_handle, int status) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "gotWriteResult");
+        this.notifyAll();
     }
 
     @Override
-    public void gotMtuResult(int conn_handle, int status) {
+    public synchronized void gotMtuResult(int conn_handle, int status) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "gotMtuResult");
+        this.notifyAll();
     }
 
     @Override
-    public void gotPsmResult(int psm) {
-        // TODO Auto-generated method stub
-
+    public synchronized void gotPsmResult(int psm) {
+        Log.v(TAG, "gotPsmResult " + psm);
+        this.notifyAll();
     }
 
     @Override
-    public void processExit(int retcode) {
+    public synchronized void processExit(int retcode) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "processExit");
+        this.notifyAll();
     }
 
     @Override
-    public void processStdinClosed() {
+    public synchronized void processStdinClosed() {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "processStdinClosed");
+        this.notifyAll();
     }
 
     @Override
-    public void shellError(SHELL_ERRORS e) {
+    public synchronized void shellError(SHELL_ERRORS e) {
         // TODO Auto-generated method stub
-
+        Log.v(TAG, "shellError");
+        this.notifyAll();
     }
 }

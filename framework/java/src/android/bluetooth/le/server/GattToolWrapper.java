@@ -260,9 +260,14 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
             return false;
         }
         
+        String u = uuid.toString();
+        
+        if (uuid.getUuid16()>0)
+            u = IntegralToString.intToHexString(uuid.getUuid16(), true, 4);
+        
         mStatus = STATUS.PRIMARY_DISCOVERY_UUID;
         Log.v(TAG, "new status: " + mStatus);
-        return sendCommand("primary " + uuid.toString());
+        return sendCommand("primary " + u);
     }
     
     public synchronized boolean characteristicsDiscovery(){
@@ -499,8 +504,10 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
                         mHandler.EOF();
                         break;
                     }
-                    if ("".equals(line))
+                    if ("".equals(line.trim())){
+                        Log.v(TAG, "empty line");
                         continue;
+                    }
                     Log.v(TAG, "got line: " + line);
                     mHandler.lineReceived(line);
                 }
@@ -526,9 +533,9 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     private static final Pattern PROMPT = Pattern.compile(
             "\\[(.*){3}\\]\\[([0-9A-F\\:\\s]{17})\\]\\[(.*){2}\\]");
     private static final Pattern RESULT = Pattern.compile(
-            "([A-Z\\-]*)\\((\\d{4})\\):\\s*(.*)");
+            "([A-Z\\-]*)\\(([A-Za-z0-9]{4})\\):\\s*(.*)");
     private static final Pattern ERROR = Pattern.compile(
-            "ERROR\\((\\d{4}))\\).*:.*\\((\\d*),(\\d*)\\):.*");
+            "ERROR\\(([A-Za-z0-9]{4})\\).*:.*\\((\\d*),(\\d*)\\):.*");
 
     private static final Vector<String> END_COMMAND_RESULTS = new Vector<String>();
     
