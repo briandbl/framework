@@ -21,6 +21,7 @@ import android.app.IActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.server.BlueZInterface.BlueZConnectionError;
+import android.bluetooth.le.server.GattToolWrapper.SEC_LEVEL;
 import android.bluetooth.le.server.GattToolWrapper.SHELL_ERRORS;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -50,6 +51,7 @@ import org.freedesktop.dbus.Path;
 import org.freedesktop.dbus.UInt32;
 import org.freedesktop.dbus.Variant;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,7 +62,7 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.Vector;
 
-public class BluetoothGatt extends IBluetoothGatt.Stub implements 
+public class BluetoothGatt extends IBluetoothGatt.Stub implements
         BlueZInterface.Listener, GattToolWrapper.GattToolListener {
     private BlueZInterface mBluezInterface;
     private BluetoothAdapter mAdapter;
@@ -77,9 +79,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
     private byte mNextAppID = 0;
 
+    private static final int GATTTOOL_POOL_SIZE = 5;
+
     /**
-     * this class member is used for enabling and disabling the Bluez interface depending on wheter
-     * it's running or not
+     * this class member is used for enabling and disabling the Bluez interface
+     * depending on whether it's running or not.
      */
     BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -109,7 +113,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
     };
 
-    public BluetoothGatt() {
+    /**
+     * Constructor for the class, initializes the pieces needed by us.
+     * 
+     * @throws IOException if GattTool pool fails to initialize.
+     */
+    public BluetoothGatt() throws IOException {
         Log.v(TAG, "new bluetoothGatt");
 
         mAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -127,10 +136,16 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         registerBroadcastReceiver(mReceiver,
                 new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+
+        GattToolWrapper.initWorkerPool(GATTTOOL_POOL_SIZE);
     }
 
     @SuppressWarnings("rawtypes")
     @Override
+    /**
+     * This function will return the kind of Bluetooth Device based on the 
+     * Bluetooth Address.
+     */
     public byte getDeviceType(String address) {
         @SuppressWarnings("rawtypes")
         Map<String, Variant> prop = null;
@@ -144,10 +159,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         /*
          * LE provides - Address, RSSI, Name, Paired, Broadcaster, UUIDs, Class
-         * 0 or no class at all
-         * 
-         * BD/EDR provides: Address, Class, Icon, RSSI, Name, Alias, LegacyPairing,
-         * Paired, UUIDs
+         * 0 or no class at all BD/EDR provides: Address, Class, Icon, RSSI,
+         * Name, Alias, LegacyPairing, Paired, UUIDs
          */
         if (prop.containsKey("Icon") && prop.containsKey("LegacyPairing"))
             return BleAdapter.DEVICE_TYPE_BREDR;
@@ -155,15 +168,17 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Variant c = null;
         if (prop.containsKey("Class"))
             c = prop.get("Class");
-        
-        if (c != null && ((UInt32) c.getValue()).intValue()!=0)
+
+        if (c != null && ((UInt32) c.getValue()).intValue() != 0)
             return BleAdapter.DEVICE_TYPE_DUMO;
-        
-            
+
         return BleAdapter.DEVICE_TYPE_BLE;
     }
 
     @SuppressWarnings("unused")
+    /**
+     *
+     */
     private class IntentReceiver extends IIntentReceiver.Stub {
         private boolean mFinished = false;
 
@@ -241,6 +256,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.e(TAG, "couldn't resolve broadcastIntent");
     }
 
+    /**
+     * Internal method that will broadcast intents using reflections.
+     * 
+     * @param intent
+     */
     public void broadcastIntent(Intent intent) {
         if (mBroadcast == null) {
             Log.v(TAG, "no broadcastIntent, sorry");
@@ -293,6 +313,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
+    /**
+     * Will get called by BlueZ layer when a new device is discovered.
+     */
     public void deviceDiscovered(String address, String name, short rssi) {
         Intent intent = new Intent(BluetoothDevice.ACTION_FOUND);
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mAdapter.getRemoteDevice(address));
@@ -303,6 +326,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
+    /**
+     * Allows clients to list all the UUIDs provided by the remote device
+     * address.
+     */
     public void getUUIDs(String address) {
         List<String> uuids = null;
 
@@ -326,6 +353,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         broadcastIntent(intent);
     }
 
+    /**
+     * Internal class used to wrap all the information needed to talk to binder
+     * clients.
+     */
     class AppWrapper {
         BluetoothGattID mGattID;
         byte mIfaceID;
@@ -339,6 +370,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
     }
 
+    /**
+     * Internal class that allows to map connection ids with remote address,
+     * application wrapper and gatttool instance.
+     */
     class ConnectionWrapper {
         int connID;
         AppWrapper wrapper;
@@ -351,30 +386,44 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.remote = r;
         }
     }
-    
-    private Map<String, ConnectionWrapper> mPendingConnections = 
+
+    /*
+     * Map of connections that still didn't complete or failed, we use Address
+     * as key as we don't have a connection handle until connection is
+     * stablished.
+     */
+    private Map<String, ConnectionWrapper> mPendingConnections =
             new HashMap<String, ConnectionWrapper>();
 
-    private Map<Integer, ConnectionWrapper> mConnectionMap = new HashMap<Integer, ConnectionWrapper>();
+    /*
+     * Map of connections running, we map with connection id as we now it.
+     */
+    private Map<Integer, ConnectionWrapper> mConnectionMap =
+            new HashMap<Integer, ConnectionWrapper>();
 
     /* ************************************************************************************
      * Connection handling methods
-     *************************************************************************************/
+     * ***********************************************
+     * ************************************
+     */
     @Override
+    /**
+     * Callback from GattToolWrapper when connection completes or fails.
+     */
     public synchronized void connected(int conn_handle, String addr, int status) {
         Log.v(TAG, "connected " + addr + " -> " + conn_handle + " " + status);
-        if (!mPendingConnections.containsKey(addr)){
+        if (!mPendingConnections.containsKey(addr)) {
             Log.e(TAG, "remote no longer pending!");
             return;
         }
-        
+
         ConnectionWrapper cw = mPendingConnections.get(addr);
         mPendingConnections.remove(addr);
-        
+
         cw.connID = conn_handle;
 
         try {
-            if (status == BleConstants.GATT_SUCCESS){
+            if (status == BleConstants.GATT_SUCCESS) {
                 mConnectionMap.put(conn_handle, cw);
                 cw.wrapper.mCallback.onConnected(addr, conn_handle);
             }
@@ -387,20 +436,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         this.notifyAll();
     }
 
-    
-    
     @Override
+    /**
+     * Method called by binder clients to start connecting to remote devices.
+     */
     public synchronized void open(byte interfaceID, final String remote, boolean foreground) {
         Log.v(TAG, "open " + interfaceID + " " + remote);
 
         final AppWrapper w = this.registeredAppsByID[interfaceID];
-        
+
         GattToolWrapper gtw = null;
         ConnectionWrapper cw = null;
-        
+
         try {
             gtw = GattToolWrapper.getWorker();
             cw = new ConnectionWrapper(w, remote);
+            gtw.setListener(this); // register to get signals from this worker.
             cw.mGattTool = gtw;
             mPendingConnections.put(remote, cw);
         } catch (Exception e) {
@@ -413,28 +464,32 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             return;
         }
 
-        if (getDeviceType(remote) == BleAdapter.DEVICE_TYPE_BREDR){
+        if (getDeviceType(remote) == BleAdapter.DEVICE_TYPE_BREDR) {
             Log.v(TAG, "Connecting to BR device, setting psm=31");
             gtw.psm(31);
         }
         gtw.connect(remote);
-        
+
         if (foreground)
             try {
                 this.wait();
-            } catch (InterruptedException e) { 
+            } catch (InterruptedException e) {
             }
     }
-    
+
     @Override
+    /**
+     * Callback from GattToolWrapper that tells us when a connection has
+     * been closed, for what ever reason it did.
+     */
     public synchronized void disconnected(int conn_handle, String addr) {
         Log.v(TAG, "disconnected " + addr + " -> " + conn_handle);
         ConnectionWrapper cw;
-        if (mPendingConnections.containsKey(addr)){
+        if (mPendingConnections.containsKey(addr)) {
             Log.i(TAG, "disconnect on pending connection");
             cw = mPendingConnections.get(addr);
-            mPendingConnections.remove(addr);    
-        } else if (mConnectionMap.containsKey(conn_handle)){
+            mPendingConnections.remove(addr);
+        } else if (mConnectionMap.containsKey(conn_handle)) {
             Log.i(TAG, "disconnected from real connection");
             cw = mConnectionMap.get(addr);
             mConnectionMap.remove(addr);
@@ -442,9 +497,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Log.e(TAG, "Address is not registered as pending or connected, aborting");
             return;
         }
-        
+        cw.mGattTool.setListener(null); // stop getting signals
         cw.mGattTool.releaseWorker();
-        
+
         try {
             cw.wrapper.mCallback.onDisconnected(conn_handle, addr);
         } catch (RemoteException e) {
@@ -453,31 +508,36 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         this.notifyAll();
     }
-    
+
     @Override
-    public synchronized void close(final byte interfaceID, final String remote, 
+    /**
+     * Method that binder clients will call when they want to close a connection, or
+     * cancel a pending connection. The way to tell what's the case is given by
+     * connHandle, connHandle should be 0 for pending connections.
+     */
+    public synchronized void close(final byte interfaceID, final String remote,
             int connHandle, boolean foreground) {
-        Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID 
+        Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID
                 + " connHandle " + connHandle);
 
         ConnectionWrapper cw = null;
-        if (connHandle == 0){
-            if (mPendingConnections.containsKey(remote)){
+        if (connHandle == 0) {
+            if (mPendingConnections.containsKey(remote)) {
                 cw = mPendingConnections.get(remote);
                 mPendingConnections.remove(remote);
             }
         } else {
-            if (mConnectionMap.containsKey(connHandle)){
+            if (mConnectionMap.containsKey(connHandle)) {
                 cw = mConnectionMap.get(remote);
                 mConnectionMap.remove(remote);
             }
         }
-        
+
         if (cw == null) {
             Log.e(TAG, "disconnect for non pending or known connection");
             return;
         }
-        
+
         cw.mGattTool.disconnect();
         cw.mGattTool.releaseWorker();
         cw.mGattTool = null;
@@ -491,9 +551,15 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     /* *******************************************************************************
      * Application handling methods
-     ********************************************************************************/
+     * **********************************************
+     * ********************************
+     */
     @Override
-    public void registerApp(BluetoothGattID appUuid, IBleClientCallback callback) {
+    /**
+     * This method will get called when ever a new BLE application starts running.
+     * Apps needs to be registered for us to talk to it.
+     */
+    public synchronized void registerApp(BluetoothGattID appUuid, IBleClientCallback callback) {
         AppWrapper wrapper = null;
         Log.v(TAG, "register app " + appUuid + " callback " + callback);
         if (registeredApps.containsKey(appUuid)) {
@@ -537,51 +603,146 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
-    public void unregisterApp(byte interfaceID) {
+    /**
+     * When an application is finishing or don't want to do LE any more should
+     * call this method.
+     */
+    public synchronized void unregisterApp(byte interfaceID) {
         for (Entry<BluetoothGattID, AppWrapper> v : registeredApps.entrySet()) {
-            if (v.getValue().mIfaceID == interfaceID) {
-                if (v.getValue().mCallback.asBinder().pingBinder())
-                    try {
-                        v.getValue().mCallback.onAppDeregistered(interfaceID);
-                    } catch (RemoteException e) {
-                        Log.e(TAG, "failed notifying client of deregistration", e);
-                    }
-                registeredApps.remove(v.getKey());
-                Log.v(TAG, "app successfully unregistered for interface: " + interfaceID +
-                        ", uuid: " + v.getValue().mGattID);
-                return;
+            AppWrapper a = v.getValue();
+            if (a.mIfaceID != interfaceID)
+                continue;
+
+            for (Entry<String, ConnectionWrapper> e : mPendingConnections.entrySet()) {
+                ConnectionWrapper cw = e.getValue();
+                if (cw.wrapper != a)
+                    continue;
+                Log.v(TAG, "canceling connection for " + e.getKey());
+                if (cw.mGattTool != null)
+                    cw.mGattTool.disconnect();
+                cw.mGattTool.setListener(null);
+                cw.mGattTool.releaseWorker();
+                cw.mGattTool = null;
+                mPendingConnections.remove(e.getKey());
             }
+
+            for (Entry<Integer, ConnectionWrapper> e : mConnectionMap.entrySet()) {
+                ConnectionWrapper cw = e.getValue();
+                if (cw.wrapper != a)
+                    continue;
+                Log.v(TAG, "forcing connection close for " + e.getKey());
+                if (cw.mGattTool != null)
+                    cw.mGattTool.disconnect();
+                cw.mGattTool.setListener(null);
+                cw.mGattTool.releaseWorker();
+                cw.mGattTool = null;
+                mConnectionMap.remove(e.getKey());
+            }
+
+            registeredApps.remove(v.getKey());
+            try {
+                a.mCallback.onAppDeregistered(interfaceID);
+            } catch (RemoteException e) {
+                Log.e(TAG, "failed notifying client of deregistration", e);
+            }
+            Log.v(TAG, "app successfully unregistered for interface: " + interfaceID +
+                    ", uuid: " + v.getValue().mGattID);
+            return;
         }
         Log.e(TAG, "interfaceID not known " + interfaceID);
         return;
     }
 
-    @Override
-    public void setEncryption(String address, byte action) {
-        Log.v(TAG, "setEncryption " + address + " " + action);
-        this.mAdapter.getRemoteDevice(address).createBond();
+    private ConnectionWrapper getConnectionWrapperForAddress(String remote) {
+        for (Entry<String, ConnectionWrapper> e : mPendingConnections.entrySet()) {
+            ConnectionWrapper cw = e.getValue();
+            if (cw.remote.equals(remote))
+                return cw;
+        }
+
+        for (Entry<Integer, ConnectionWrapper> e : mConnectionMap.entrySet()) {
+            ConnectionWrapper cw = e.getValue();
+            if (cw.remote.equals(remote))
+                return cw;
+        }
+        
+        return null;
     }
 
     @Override
-    public void searchService(final int connID, final BluetoothGattID serviceID) {
+    /**
+     * Change the security level of the connection.
+     */
+    public synchronized void setEncryption(String address, byte action) {
+        Log.v(TAG, "setEncryption " + address + " " + action);
+        Log.e(TAG, "not implemented");
+
+        ConnectionWrapper cw = getConnectionWrapperForAddress(address);
+        if (cw==null){
+            Log.e(TAG, "no connection wrapper for this address");
+            return;
+        }
+        if (cw.mGattTool==null){
+            Log.w(TAG, "no gatttool wrapper for this address");
+        }
+        
+
+        if (action == BleConstants.GATT_AUTH_REQ_NO_MITM)
+            cw.mGattTool.secLevel(SEC_LEVEL.LOW);
+        if (action == BleConstants.GATT_AUTH_REQ_MITM)
+            cw.mGattTool.secLevel(SEC_LEVEL.MEDIUM);
+        if (action == BleConstants.GATT_AUTH_REQ_SIGNED_NO_MITM || 
+                action == BleConstants.GATT_AUTH_REQ_SIGNED_MITM)
+            cw.mGattTool.secLevel(SEC_LEVEL.HIGH);
+        else {
+            Log.e(TAG, "invalid sec level");
+            return;
+        }
+        try {
+            this.wait();
+        } catch (InterruptedException e) {
+            Log.e(TAG, "interrupted while waiting sec-level to settle");
+        }
+    }
+    
+    @Override
+    /**
+     * callback from GattToolWrapper to let us know sec-level transaction completed
+     */
+    public synchronized void gotSecurityLevelResult(int conn_handle, int status) {
+        Log.v(TAG, "got security level result " + conn_handle + " " + status);
+        this.notifyAll();
+    }
+
+    @Override
+    public synchronized void searchService(final int connID, final BluetoothGattID serviceID) {
         Log.v(TAG, "searchService " + connID + " " + serviceID);
 
-        final Integer id = new Integer(connID);
-        if (!mConnectionMap.containsKey(id)) {
+        if (!mConnectionMap.containsKey(connID)) {
             Log.e(TAG, "connection id not known on search service");
             return;
         }
+        
+        ConnectionWrapper cw = mConnectionMap.get(connID);
+        GattToolWrapper gatt = cw.mGattTool;
+        
+        if (gatt == null) {
+            Log.e(TAG, "gatt tool wrapper is null!!!");
+            return;
+        }
 
-        new Thread() {
-            public void run() {
-                String address = mConnectionMap.get(id).remote;
-                try {
-                    mBluezInterface.getServices(connID, address, serviceID);
-                } catch (Exception e) {
-                    Log.e(TAG, "getServices error", e);
-                }
-            }
-        }.start();
+        if (serviceID != null) {
+            BleGattID i = null;
+            int u16 = serviceID.getUuid16();
+            if (u16 > 0)
+                i = new BleGattID(new Integer(u16));
+            else
+                i = new BleGattID(serviceID.getUuid());
+            
+            gatt.primaryDiscoveryByUUID(i);
+        } else {
+            gatt.primaryDiscovery();
+        }
     }
 
     class CharacteristicWrapper {
@@ -1040,8 +1201,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private Map<String, List<BluetoothGattCharID>> mNotificationListener =
             new HashMap<String, List<BluetoothGattCharID>>();
 
-    private int internalRegisterForNotifications(ServiceWrapper ser, byte ifaceID, 
-            String address, BluetoothGattCharID charID){
+    private int internalRegisterForNotifications(ServiceWrapper ser, byte ifaceID,
+            String address, BluetoothGattCharID charID) {
 
         if (!mNotificationListener.containsKey(address)) {
             Log.v(TAG, "address not registered for notifications, adding map");
@@ -1052,19 +1213,19 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         if (!ser.mUuids.containsKey(charID.getSrvcId().toString())) {
             return BleConstants.GATT_ERROR;
-        } 
+        }
 
         String service = ser.mUuids.get(charID.getSrvcId().toString());
 
         Map<BluetoothGattID, String> ids = null;
-        
+
         try {
             ids = mBluezInterface.getCharacteristicsForService(service);
         } catch (Exception e) {
             Log.e(TAG, "failed to get ids", e);
             return BleConstants.GATT_ERROR;
         }
-            
+
         for (Entry<BluetoothGattID, String> e : ids.entrySet()) {
             Log.v(TAG, e.getValue() + " -> " + e.getKey());
             try {
@@ -1078,10 +1239,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
 
         Log.v(TAG, "registered new notification listener");
-        
+
         return BleConstants.GATT_SUCCESS;
     }
-    
+
     @Override
     public boolean registerForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) {
@@ -1091,15 +1252,15 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         ServiceWrapper ser = getServiceWrapper(address);
         if (ser == null || ser.mCallback == null)
             return false;
-        
+
         int ret = internalRegisterForNotifications(ser, ifaceID, address, charID);
-        
+
         try {
             ser.mCallback.onRegForNotifications(-1, ret, charID.getSrvcId(), charID.getCharId());
         } catch (RemoteException e) {
             Log.e(TAG, "failed during onRegForNotifications ret: " + ret);
         }
-        
+
         return ret == BleConstants.GATT_SUCCESS;
     }
 
@@ -1130,8 +1291,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         return r.size() > 0;
     }
-    
-    
 
     @Override
     public void setScanParameters(int scanInterval, int scanWindow) {
@@ -1196,8 +1355,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         System.exit(0);
 
     }
-
-
 
     @Override
     public void getFirstIncludedService(int connID, BluetoothGattID serviceID, BluetoothGattID id2) {
@@ -1438,121 +1595,115 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     @Override
     public void onNotification(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void onIndication(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void primaryAll(int conn_handle, int start, int end, BleGattID uuid) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void primaryAllEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void primaryUuid(int conn_handle, int start, int end) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void primaryUuidEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void characteristic(int conn_handle, int handle, short properties, int value_handle,
             BleGattID uuid) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void characteristicEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void characteristicDescriptor(int conn_handle, int handle, BleGattID uuid) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void characteristicDescriptorEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void gotValueByHandle(int conn_handle, byte[] value, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void gotValueByUuid(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void gotValueByUuidEnd(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void gotWriteResult(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
-    }
 
-    @Override
-    public void gotSecurityLevelResult(int conn_handle, int status) {
-        // TODO Auto-generated method stub
-        
     }
 
     @Override
     public void gotMtuResult(int conn_handle, int status) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void gotPsmResult(int psm) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void processExit(int retcode) {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void processStdinClosed() {
         // TODO Auto-generated method stub
-        
+
     }
 
     @Override
     public void shellError(SHELL_ERRORS e) {
         // TODO Auto-generated method stub
-        
+
     }
 }
