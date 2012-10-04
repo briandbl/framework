@@ -379,6 +379,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         int start;
         int end;
         List<Characteristic> chars = new Vector<Characteristic>();
+        Characteristic lastChar = null;
         Integer lastCharResult = null;
         
         IBleCharacteristicDataCallback callback;
@@ -402,7 +403,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         short properties;
         int value_handle;
         Service service;
-        List<CharacteristicDescriptor> descriptors = new Vector<CharacteristicDescriptor>();
+        Descriptor lastDescriptor;
+        List<Descriptor> descriptors = new Vector<Descriptor>();
         
         public Characteristic(int handle, short properties, int value_handle, BleGattID id){
             this.handle = handle;
@@ -410,10 +412,17 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.value_handle = value_handle;
             this.uuid = id;
         }
+        
+        public void addDescriptor(Descriptor d){
+            this.descriptors.add(d);
+            d.parent = this;
+        }
     }
     
-    private class CharacteristicDescriptor {
-        
+    private class Descriptor {
+        int handle;
+        BleGattID uuid;
+        Characteristic parent;
     }
     
     /**
@@ -427,7 +436,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         GattToolWrapper mGattTool;
         Map<BleGattID, List<Service>> services;
         BleGattID lastPrimaryUuid;
-        Service lastCharacteristicDiscoveryService;
+        Service lastService;
         
         public ConnectionWrapper(AppWrapper w, String r) {
             this.connID = -1; // mark as pending
@@ -944,7 +953,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstChar");
         Service s = getServiceForConnIDServiceID(connID, serviceID, "getFirstChar");
         if (cw==null || s==null || s.callback == null){
-            Log.e(TAG, "no callback access, can't read chars");
+            Log.e(TAG, "no callback access, can't discover chars");
             return;
         }
         
@@ -960,7 +969,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         
         cw.mGattTool.characteristicsDiscovery(s.start, s.end);
         
-        cw.lastCharacteristicDiscoveryService = s;
+        cw.lastService = s;
         
         s.lastCharResult = null;
         
@@ -996,10 +1005,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.v(TAG, "got characteristic " + connID + " " + handle);
         
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristic callback");
-        if ( cw == null || cw.lastCharacteristicDiscoveryService == null)
+        if ( cw == null || cw.lastService == null)
             return;
         
-        Service s = cw.lastCharacteristicDiscoveryService;
+        Service s = cw.lastService;
         s.addCharacteristic(new Characteristic(handle, properties, value_handle, uuid));
     }
     
@@ -1011,9 +1020,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.v(TAG, "characteristicEnd " + connID + " " + status);
         
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicEnd callback");
-        if ( cw == null || cw.lastCharacteristicDiscoveryService == null)
+        if ( cw == null || cw.lastService == null)
             return;
-        Service s = cw.lastCharacteristicDiscoveryService;
+        Service s = cw.lastService;
         s.lastCharResult = new Integer(status);
         this.notifyAll();
     }
@@ -1028,7 +1037,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Service s = getServiceForConnIDServiceID(connID, serviceID, "getFirstChar");
         
         if (cw==null || s==null || s.callback == null){
-            Log.e(TAG, "no callback access, can't read chars");
+            Log.e(TAG, "no callback access, can't discover chars");
             return;
         }
         
@@ -1058,6 +1067,116 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Log.e(TAG, "failed calling onGetNextCharacteristic with status: " + status +
                     " charID: " + gid);
         }
+    }
+    
+    /* **************************************************************************************
+     * char and descriptors reading methods
+     */
+    
+    private Characteristic getCharacteristicFromService(Service service, BluetoothGattID charID, String f){
+        
+        if (service.chars==null || service.chars.size() < charID.getInstanceID()+1) {
+            Log.v(TAG, "either no chars for this service, or the id is too big at " + f);
+            return null;
+        }
+        return service.chars.get(charID.getInstanceID());
+    }
+    
+    /**
+     * called by binder client when it wants to get the value for the descriptors
+     **/
+    @Override
+    public synchronized void readCharDescr(int connID, BluetoothGattCharDescrID charDescID, byte authReq) {
+        Log.v(TAG, "readCharDescr " + connID + " " + charDescID + " " + authReq);
+        BluetoothGattID serviceID = charDescID.getSrvcId();
+        BluetoothGattID charID = charDescID.getCharId();
+        BluetoothGattID descID = charDescID.getDescrId();
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "readCharDescr");
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "readCharDescr");
+        
+        if (cw==null || cw.mGattTool == null || s==null || s.callback == null){
+            Log.e(TAG, "something is missing can't go on");
+            return;
+        }
+        
+        Characteristic c = getCharacteristicFromService(s, charID, "readCharDescr");
+        if (c == null) {
+            Log.e(TAG, "no characteristic can't go on");
+            return;
+        }
+        
+        if (c.descriptors.size() < descID.getInstanceID()){
+            Log.e(TAG, "descriptor out of range");
+            return;
+        }
+        Descriptor d = c.descriptors.get(descID.getInstanceID());
+        cw.lastService = s;
+        s.lastChar = c;
+        c.lastDescriptor = d;
+        cw.mGattTool.readCharacteristicByHandle(d.handle);    
+    }
+    
+    @Override
+    /**
+     * called by binder client when it wants to get the value of a char
+     **/
+    public void readChar(int connID, BluetoothGattCharID charSvcID, byte authReq) {
+        Log.v(TAG, "readChar " + connID + " " + charSvcID + " " + authReq);
+        BluetoothGattID serviceID = charSvcID.getSrvcId();
+        BluetoothGattID charID = charSvcID.getCharId();
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "readChar");
+        Service s = getServiceForConnIDServiceID(connID, serviceID, "readChar");
+        
+        if (cw==null || cw.mGattTool == null || s==null || s.callback == null){
+            Log.e(TAG, "something is missing can't go on");
+            return;
+        }
+        
+        Characteristic c = getCharacteristicFromService(s, charID, "readChar");
+        if (c == null) {
+            Log.e(TAG, "no characteristic can't go on");
+            return;
+        }
+        
+        cw.lastService = s;
+        s.lastChar = c;
+        c.lastDescriptor = null;
+        cw.mGattTool.readCharacteristicByHandle(c.handle);    
+    }
+    
+    @Override
+    /**
+     * This callback gets called when GattToolWrapper was able to resolve a value.
+     */
+    public synchronized void gotValueByHandle(int connID, byte[] value, int status) {
+        Log.v(TAG, "gotValueByHandle " + connID +" " + status +" got" + value);
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "gotValueByHandle");
+        if (cw==null)
+            return;
+        Service s = cw.lastService;
+        Characteristic c = s.lastChar;
+        
+        if (c.lastDescriptor != null) {
+            Descriptor d = c.lastDescriptor;
+            try {
+                s.callback.onReadCharDescriptorValue(connID, status, s.uuid, c.uuid, d.uuid, value);
+            } catch (RemoteException e) {
+                Log.e(TAG, "error when calling onReadCharDescriptorValue", e);
+            }
+        } else {
+            try {
+                s.callback.onReadCharacteristicValue(connID, status, s.uuid, c.uuid, value);
+            } catch (RemoteException e) {
+                Log.e(TAG, "error when calling onReadCharacteristicValue", e);
+            }
+        }
+
+        // cleanup stack.
+        c.lastDescriptor = null;
+        s.lastChar = null;
+        cw.lastService = null;
     }
 
     class CharacteristicWrapper {
@@ -1195,26 +1314,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         return ser.mCharacteristics.get(service);
     }
 
-    @Override
-    public void readCharDescr(int connID, BluetoothGattCharDescrID charDescID, byte authReq) {
-        Log.v(TAG, "readCharDescr " + connID + " " + charDescID);
-
-        ServiceWrapper w = getServiceWrapper(connID);
-
-        if (w == null || w.mCallback == null) {
-            Log.e(TAG, "no service wrapper or no callback, can't do anything");
-            return;
-        }
-
-        Log.v(TAG, "No support for this, so we will tell we can't find it");
-
-        try {
-            w.mCallback.onReadCharDescriptorValue(connID, BleConstants.GATT_NOT_FOUND,
-                    null, null, null, null);
-        } catch (RemoteException e) {
-            Log.e(TAG, "failed sending onReadCharDescriptorValue");
-        }
-    }
+   
 
     @Override
     public void getFirstCharDescr(int connID, BluetoothGattCharID charID, BluetoothGattID id) {
@@ -1336,37 +1436,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             }
         }
         return value;
-    }
-
-    @Override
-    public void readChar(int connID, BluetoothGattCharID svcID, byte authReq) {
-        Log.v(TAG, "readChar " + svcID + " " + authReq);
-
-        ServiceWrapper w = getServiceWrapper(connID);
-        if (w == null || w.mCallback == null) {
-            Log.e(TAG, "no service wrapper or callback can't do anything");
-            return;
-        }
-
-        Log.v(TAG, "got ser wrapper");
-
-        byte[] value = null;
-
-        if (!w.svcID.equals(svcID.getSrvcId())) {
-            Log.e(TAG, "wrong service ID " + w.svcID + ", " + svcID.getSrvcId());
-        } else {
-            value = this.internalGetCharacteristicWrapperValue(connID, svcID);
-        }
-
-        int status = value != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR;
-
-        Log.v(TAG, "doing onReadCharacteristicValue status: " + status + " value: " + value);
-        try {
-            w.mCallback.onReadCharacteristicValue(connID, status, svcID.getSrvcId(),
-                    svcID.getCharId(), value);
-        } catch (RemoteException e) {
-            Log.e(TAG, "failed doing onReadCharacteristicValue");
-        }
     }
 
     private boolean internalWriteCharWrapper(int connID, BluetoothGattCharID svcID, byte[] val) {
@@ -1839,12 +1908,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     @Override
     public void characteristicDescriptorEnd(int conn_handle, int status) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void gotValueByHandle(int conn_handle, byte[] value, int status) {
         // TODO Auto-generated method stub
 
     }
