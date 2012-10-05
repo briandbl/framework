@@ -449,6 +449,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private class Attribute {
     	int handle;
         BleGattID uuid;
+        Service service;
         
         public Attribute(int handle, BleGattID uuid){
         	this.handle = handle;
@@ -462,7 +463,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         int value_handle;
         int end = 0xffff;
         boolean descFlag;
-        Service service;
         Descriptor lastDescriptor;
         Integer lastDescriptorStatus = null;
         List<Descriptor> descriptors = new Vector<Descriptor>();
@@ -478,10 +478,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.descriptors.add(d);
             d.parent = this;
             service.conn.mAttributesByHandle.put(d.handle, d);
+            d.service = service;
         }
         
         public void addValueAttribute(Attribute a){
         	service.conn.mAttributesByHandle.put(a.handle, a);
+        	a.service = service;
         }
     }
     
@@ -947,10 +949,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     public synchronized void primaryUuidEnd(int connID, int status) {
         Log.v(TAG, "primaryUuidEnd " + connID + ", " + status);
         this.primaryAllEnd(connID, status);
-    }
-    
-    private Service getServiceForConnIDServiceID(int connID, BluetoothGattID serviceID){
-        return getServiceForConnIDServiceID(connID, serviceID, "NN");
     }
     
     private Service getServiceForConnIDServiceID(int connID, BluetoothGattID serviceID, String f){
@@ -1569,27 +1567,27 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         		Log.v(TAG, "disabled ignoring");
         		continue;
         	}
-        	for (Map.Entry<BleGattID, List<Service>> e: conn.services.entrySet()){
-        		for (Service s: e.getValue()){
-        			for (Characteristic characteristic: s.chars){
-        				if (characteristic.handle == handle || characteristic.value_handle == handle){
-        					Log.v(TAG, "found handle match!");
-        					if (!nl.uuid.equals(characteristic.uuid)) {
-        						Log.v(TAG, "uuid missmatch");
-        						continue;
-        					}
-        					try {
-								s.callback.onNotify(conn_handle, remote, s.uuid, characteristic.uuid, 
-										true, value);
-							} catch (RemoteException e1) {
-								Log.v(TAG, "error while doing onNotify", e1);
-							}
-        				}
-        			}
-        		}
+        	if (!conn.mAttributesByHandle.containsKey(handle)) {
+        		Log.v(TAG, "connection doesn't know about this attribute handle");
+        		continue;
         	}
+        	
+        	Attribute a = conn.mAttributesByHandle.get(handle);
+        	if (!a.uuid.equals(nl.uuid)){
+        		Log.v(TAG, "uuid mismatch handler doesn't match the uuid we're tracking ");
+        		Log.v(TAG, "attribute: " + a.uuid);
+        		Log.v(TAG, "listener:  " + nl.uuid);
+        		continue;
+        	}
+			try {
+				a.service.callback.onNotify(conn_handle, remote, a.service.uuid, 
+						a.uuid, true, value);
+			} catch (RemoteException e1) {
+				Log.v(TAG, "error while doing onNotify", e1);
+			}
+	
         }
-        
+        Log.v(TAG, "notification completed");
         this.notifyAll();
     }
 
