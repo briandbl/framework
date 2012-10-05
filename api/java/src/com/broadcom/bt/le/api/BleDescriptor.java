@@ -111,5 +111,4 @@ public class BleDescriptor extends BleAttribute
         this.mDirty = true;
         return 0;
     }
-
 }
