@@ -1459,8 +1459,20 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.v(TAG, "writeCharDescrValue end");
 
     }
+    
+    @Override
+    public boolean registerForNotifications(byte ifaceID, String address,
+            BluetoothGattCharID charID) {
+    	return false;
+    }
 
-    class CharacteristicWrapper {
+    @Override
+    public boolean deregisterForNotifications(byte interfaceID, String address,
+            BluetoothGattCharID charID) {
+    	return false;
+    }
+
+    private class CharacteristicWrapper {
         BluetoothGattID gattID;
         String path;
 
@@ -1470,7 +1482,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
     }
 
-    class ServiceWrapper {
+    private class ServiceWrapper {
         String mAddress;
         Map<String, String> mUuids = new HashMap<String, String>();
         Map<String, List<CharacteristicWrapper>> mCharacteristics = new HashMap<String,
@@ -1517,18 +1529,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     // maps address to services been watched
     private Map<String, List<BluetoothGattCharID>> mNotificationListener =
             new HashMap<String, List<BluetoothGattCharID>>();
-
-    @Override
-    public boolean registerForNotifications(byte ifaceID, String address,
-            BluetoothGattCharID charID) {
-    	return false;
-    }
-
-    @Override
-    public boolean deregisterForNotifications(byte interfaceID, String address,
-            BluetoothGattCharID charID) {
-    	return false;
-    }
 
     @Override
     public void setScanParameters(int scanInterval, int scanWindow) {
@@ -1775,49 +1775,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     @Override
     public void valueChanged(String path, byte[] val) {
-        String[] p = path.split("/");
-        String dev = p[p.length - 2];
-        Log.v(TAG, "device " + dev);
-
-        BluetoothGattCharID id = null;
-
-        if (!mNotificationListener.containsKey(dev)) {
-            Log.v(TAG, "device not registered for notifications");
-            return;
-        }
-
-        id = mNotificationListener.get(dev).get(0);
-
-        ServiceWrapper w = null;
-
-        if (!mRemoteServices.containsKey(dev)) {
-            Log.v(TAG, "service wrapper not available can't notify");
-            return;
-        }
-
-        w = mRemoteServices.get(dev);
-
-        int connID = -1;
-
-        for (Entry<Integer, ConnectionWrapper> conn : mConnectionMap.entrySet()) {
-            if (conn.getValue().remote.equals(dev)) {
-                connID = conn.getKey();
-                break;
-            }
-        }
-
-        if (connID == -1) {
-            Log.v(TAG, "failed to resolve connID");
-            return;
-        }
-
-        Log.v(TAG, "notifing");
-        try {
-            w.mCallback.onReadCharacteristicValue(connID, BleConstants.GATT_SUCCESS,
-                    id.getSrvcId(), id.getCharId(), val);
-        } catch (RemoteException e) {
-            Log.e(TAG, "failed notifiying", e);
-        }
+       Log.e(TAG, "ignoring valueChanged");
     }
 
     @Override
