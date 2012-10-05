@@ -26,6 +26,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 /**
@@ -216,11 +217,12 @@ public class BleCharacteristic extends BleAttribute
      */
     public BleDescriptor getDescriptor(BleGattID descriptor)
     {
-        BleDescriptor descObj = mDescriptorMap.get(descriptor);
-        if (descObj != null) {
-            return descObj;
+        // TODO:
+        // Need to implemet hashcodes to make this more efficient
+        for (Entry<BleGattID, BleDescriptor>e : mDescriptorMap.entrySet()){
+            if (e.getKey().equals(descriptor))
+                return e.getValue();
         }
-
         return null;
     }
 
@@ -479,5 +481,5 @@ public class BleCharacteristic extends BleAttribute
                 + uuid128);
         return null;
     }
-
+    
 }
