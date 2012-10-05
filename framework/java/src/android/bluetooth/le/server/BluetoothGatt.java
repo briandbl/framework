@@ -409,6 +409,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Service s = new Service(svcId, start, end);
             services.get(uuid).add(s);
             s.conn = this;
+            this.mServiceByHandle.put(start, s);
             return s;
         }
     }
@@ -417,7 +418,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * internal class used for "remembering the services", only once instance of this
      * class should be available per registered service per instance per device.
      */
-    @SuppressWarnings("unused")
     private class Service {
         BluetoothGattID uuid;
         int start;
@@ -442,13 +442,18 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.chars.add(c);
             if (chars.size()>1)
                 chars.get(c.uuid.getInstanceID()-1).end = c.handle-1;
-            
+            c.service.conn.mCharacteristicByHandle.put(c.handle, c);
         }
     }
     
     private class Attribute {
     	int handle;
         BleGattID uuid;
+        
+        public Attribute(int handle, BleGattID uuid){
+        	this.handle = handle;
+        	this.uuid = uuid;
+        }
     }
     
     @SuppressWarnings("unused")
@@ -463,16 +468,20 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         List<Descriptor> descriptors = new Vector<Descriptor>();
         
         public Characteristic(int handle, short properties, int value_handle, BleGattID id){
-            this.handle = handle;
+        	super (handle, id);
             this.properties = properties;
             this.value_handle = value_handle;
-            this.uuid = id;
         }
         
         public void addDescriptor(Descriptor d){
             d.uuid.setInstanceId(this.descriptors.size());
             this.descriptors.add(d);
             d.parent = this;
+            service.conn.mAttributesByHandle.put(d.handle, d);
+        }
+        
+        public void addValueAttribute(Attribute a){
+        	service.conn.mAttributesByHandle.put(a.handle, a);
         }
     }
     
@@ -481,8 +490,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Characteristic parent;
         
         public Descriptor(int handle, BleGattID uuid){
-            this.handle = handle;
-            this.uuid = uuid;
+        	super(handle, uuid);
         }
     }
 
@@ -1172,10 +1180,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Log.v(TAG, "ignoring spurious descriptor");
             return;
         }
+        
         if (handle!=c.value_handle) {
         	c.addDescriptor(new Descriptor(handle, uuid));
         	Log.v(TAG, "added char-desc");
         } else
+        	c.addValueAttribute(new Attribute(handle, uuid));
         	Log.e(TAG, "ignoring value handle as descriptor");
         
     }
