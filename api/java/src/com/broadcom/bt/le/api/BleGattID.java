@@ -33,6 +33,8 @@ import java.util.UUID;
 public final class BleGattID extends BluetoothGattID
         implements Parcelable
 {
+    private static final String TAG = "BleGattID";
+    
     private static final String BASE_UUID_TPL = "%08x-0000-1000-8000-00805f9b34fb";
     @SuppressWarnings({
             "rawtypes", "unchecked"
@@ -128,10 +130,10 @@ public final class BleGattID extends BluetoothGattID
      */
     public UUID getUuid() {
         if (getUuidType() == BleConstants.GATT_UUID_TYPE_128) {
-            Log.v(TAG, "returning 128b BleGattID " + super.getUuid());
+            //Log.v(TAG, "returning 128b BleGattID " + super.getUuid());
             return super.getUuid();
         }
-        Log.v(TAG, "making uuid out of 16b gattID " + Integer.toHexString(this.getUuid16()));
+        //Log.v(TAG, "making uuid out of 16b gattID " + Integer.toHexString(this.getUuid16()));
         return UUID.fromString(String.format(BASE_UUID_TPL,
                 new Object[] {
                     Integer.valueOf(getUuid16())
@@ -177,6 +179,7 @@ public final class BleGattID extends BluetoothGattID
         }
 
         if (!(target instanceof BleGattID)) {
+            Log.v(TAG, "Invalid instance, trying with super me: " + this.getClass() + " target: " + target.getClass());
             return super.equals(target);
         }
 
