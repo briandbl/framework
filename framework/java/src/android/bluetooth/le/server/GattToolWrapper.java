@@ -140,12 +140,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         }
     }
     
-    private boolean sendCommand(String i){
-        if (!mBusy){
-            Log.e(TAG, "send command on non busy worker");
-            return false;
-        }
-        
+    private synchronized boolean sendCommand(String i){
+		if (!mBusy) {
+			Log.e(TAG, "send command on non busy worker");
+			return false;
+		}
+
         Log.v(TAG,  "sendCommand " + i);
         try {
             mOutput.writeChars(i+"\n");
@@ -156,7 +156,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         }
     }
     
-    public boolean isBusy(){
+    public synchronized boolean isBusy(){
         return mBusy;
     }
     
@@ -566,7 +566,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     }
 
     @Override
-    public void lineReceived(String line) {
+    public synchronized void lineReceived(String line) {
         Log.v(TAG, "lineReceived " + line);
         
         Matcher m;
