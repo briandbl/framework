@@ -1472,34 +1472,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     	return false;
     }
 
-    private class CharacteristicWrapper {
-        BluetoothGattID gattID;
-        String path;
-
-        public CharacteristicWrapper(BluetoothGattID i, String p) {
-            gattID = i;
-            path = p;
-        }
-    }
-
-    private class ServiceWrapper {
-        String mAddress;
-        Map<String, String> mUuids = new HashMap<String, String>();
-        Map<String, List<CharacteristicWrapper>> mCharacteristics = new HashMap<String,
-                List<CharacteristicWrapper>>();
-        IBleCharacteristicDataCallback mCallback;
-        BleGattID svcID;
-
-        public ServiceWrapper(String address, String uuid, String path) {
-            super();
-            this.svcID = new BleGattID(uuid);
-            this.mAddress = address;
-            this.mUuids.put(uuid, path);
-        }
-    }
-
-    private Map<String, ServiceWrapper> mRemoteServices = new HashMap<String, ServiceWrapper>();
-
     @Override
     public int getApiLevel() {
         return API_LEVEL;
@@ -1509,10 +1481,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     public String getFrameworkVersion() {
         return FRAMEWORK_VERSION;
     }
-
-    // maps address to services been watched
-    private Map<String, List<BluetoothGattCharID>> mNotificationListener =
-            new HashMap<String, List<BluetoothGattCharID>>();
 
     @Override
     public void setScanParameters(int scanInterval, int scanWindow) {
