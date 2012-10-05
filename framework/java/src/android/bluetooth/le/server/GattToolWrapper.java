@@ -431,12 +431,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         String args = "";
         
         for (int i = 0; i < val.length ; i++)
-            args+= toSignedByteString(val[i]) + " ";
+            args+= toSignedByteString(val[i]);
         
         mStatus = STATUS.CHARACTERISTIC_WRITE_REQ;
         Log.v(TAG, "new status: " + mStatus);
         
-        return sendCommand("char-write-req " + Integer.toHexString(handle) + " " + args);
+        return sendCommand("char-write-req " + IntegralToString.intToHexString(handle, true, 4) + " " + args);
     }
     
     public synchronized boolean writeCharCmd(int handle, byte[] val){
@@ -458,12 +458,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         String args = "";
         
         for (int i = 0; i < val.length ; i++)
-            args+= toSignedByteString(val[i]) + " ";
+            args+= toSignedByteString(val[i]);
         
         mStatus = STATUS.CHARACTERISTIC_WRITE_CMD;
         Log.v(TAG, "new status: " + mStatus);
         
-        return sendCommand("char-write-cmd " + Integer.toHexString(handle) + " " + args);
+        return sendCommand("char-write-cmd " + IntegralToString.intToHexString(handle, true, 4) + " " + args);
     }
 
     private static final String TOOL = "/system/bin/gatttool-btle";
