@@ -20,7 +20,7 @@ package com.broadcom.bt.le.api;
 
 import com.broadcom.bt.service.gatt.BluetoothGattID;                                                                                   
 
-interface IBleServiceCallback {
+oneway interface IBleServiceCallback {
     
     void onServiceCreated(byte status, int svcHandle);
  

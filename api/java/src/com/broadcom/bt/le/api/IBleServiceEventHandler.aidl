@@ -20,7 +20,7 @@ package com.broadcom.bt.le.api;
 
 import com.broadcom.bt.le.api.BleGattID;
 
-interface IBleServiceEventHandler
+oneway interface IBleServiceEventHandler
 {
     void onServiceRegistered(byte status, int svcId);
     

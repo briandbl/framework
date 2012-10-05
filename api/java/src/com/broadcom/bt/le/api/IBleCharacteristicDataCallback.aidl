@@ -20,7 +20,7 @@ package com.broadcom.bt.le.api;
 
 import com.broadcom.bt.service.gatt.BluetoothGattID;
 
-interface IBleCharacteristicDataCallback {
+oneway interface IBleCharacteristicDataCallback {
     void onGetFirstCharacteristic(int connID, 
                                   int status,
                                   in BluetoothGattID svcId,
