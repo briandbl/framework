@@ -21,6 +21,8 @@ package com.broadcom.bt.service.gatt;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import com.broadcom.bt.le.api.BleConstants;
+
 public final class BluetoothGattCharDescrID
         implements Parcelable
 {
@@ -35,39 +37,10 @@ public final class BluetoothGattCharDescrID
             new Parcelable.Creator()
             {
                 public BluetoothGattCharDescrID createFromParcel(Parcel source) {
-                    int instId = source.readInt();
-                    int uuidtype = source.readInt();
-                    int serviceType = source.readInt();
-                    BluetoothGattID serviceId;
-                    if (uuidtype == 16) {
-                        String sServiceUuid = source.readString();
-                        serviceId = new BluetoothGattID(instId, sServiceUuid, serviceType);
-                    } else {
-                        int serviceUuid = source.readInt();
-                        serviceId = new BluetoothGattID(instId, serviceUuid, serviceType);
-                    }
-
-                    instId = source.readInt();
-                    uuidtype = source.readInt();
-                    BluetoothGattID charId;
-                    if (uuidtype == 16) {
-                        String sCharUuid = source.readString();
-                        charId = new BluetoothGattID(instId, sCharUuid);
-                    } else {
-                        int charUuid = source.readInt();
-                        charId = new BluetoothGattID(instId, charUuid);
-                    }
-
-                    uuidtype = source.readInt();
-                    BluetoothGattID descrId;
-                    if (uuidtype == 16) {
-                        String sDescrUuid = source.readString();
-                        descrId = new BluetoothGattID(sDescrUuid);
-                    } else {
-                        int descrUuid = source.readInt();
-                        descrId = new BluetoothGattID(descrUuid);
-                    }
-
+                    
+                    BluetoothGattID serviceId = BluetoothGattID.CREATOR.createFromParcel(source);
+                    BluetoothGattID charId = BluetoothGattID.CREATOR.createFromParcel(source);
+                    BluetoothGattID descrId = BluetoothGattID.CREATOR.createFromParcel(source);
                     return new BluetoothGattCharDescrID(serviceId, charId, descrId);
                 }
 
@@ -104,29 +77,12 @@ public final class BluetoothGattCharDescrID
     }
 
     public void writeToParcel(Parcel dest, int flags) {
-        int serviceUuidType = this.mSrvcId.getUuidType();
-        int charUuidType = this.mCharId.getUuidType();
-        int descrUuidType = this.mDescrId.getUuidType();
+        this.mSrvcId.writeToParcel(dest, flags);
+        this.mCharId.writeToParcel(dest, flags);
+        this.mDescrId.writeToParcel(dest, flags);
+    }
 
-        dest.writeInt(this.mSrvcId.getInstanceID());
-        dest.writeInt(this.mSrvcId.getUuidType());
-        dest.writeInt(this.mSrvcId.getServiceType());
-        if (serviceUuidType == 16)
-            dest.writeString(this.mSrvcId.toString());
-        else {
-            dest.writeInt(this.mSrvcId.getUuid16());
-        }
-        dest.writeInt(this.mCharId.getInstanceID());
-        dest.writeInt(this.mCharId.getUuidType());
-        if (charUuidType == 16)
-            dest.writeString(this.mCharId.toString());
-        else {
-            dest.writeInt(this.mCharId.getUuid16());
-        }
-        dest.writeInt(this.mDescrId.getUuidType());
-        if (charUuidType == 16)
-            dest.writeString(this.mDescrId.toString());
-        else
-            dest.writeInt(this.mDescrId.getUuid16());
+    public String toString(){
+        return "Service: " + this.getSrvcId() + ", Char: " + this.getCharId()  + ", Descriptor: " + this.getDescrId();
     }
 }
