@@ -395,8 +395,6 @@ public abstract class BleClientService
     {
         int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "registerForNotification address: " + remoteDevice.getAddress());
-        if (true)
-            return -1;
         try {
             BleGattID svcId = new BleGattID(instanceID, getServiceId().getUuid(),
                     getServiceId().getServiceType());
@@ -418,8 +416,6 @@ public abstract class BleClientService
     {
         int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "unregisterNotification address: " + remoteDevice.getAddress());
-        if (true)
-            return -1;
         try {
             BleGattID svcId = new BleGattID(instanceID, getServiceId().getUuid(),
                     getServiceId().getServiceType());

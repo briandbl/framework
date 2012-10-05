@@ -18,12 +18,12 @@ package android.bluetooth.le.server;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 
@@ -34,7 +34,6 @@ import android.app.ActivityManagerNative;
 import android.app.IActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.le.server.BlueZInterface.BlueZConnectionError;
 import android.bluetooth.le.server.GattToolWrapper.SEC_LEVEL;
 import android.bluetooth.le.server.GattToolWrapper.SHELL_ERRORS;
 import android.content.BroadcastReceiver;
@@ -78,6 +77,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private byte mNextAppID = 0;
 
     private static final int GATTTOOL_POOL_SIZE = 1;
+    
+    private String toIntHexString(int t){
+    	return IntegralToString.intToHexString(t, false, 0);
+    }
 
     /**
      * this class member is used for enabling and disabling the Bluez interface
@@ -343,12 +346,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         broadcastIntent(intent);
     }
-
+    
     /**
      * Internal class used to wrap all the information needed to talk to binder
      * clients.
      */
     @SuppressWarnings("unused")
+    private Set<AppWrapper> knownApps = new HashSet<AppWrapper>();
+    
     class AppWrapper {
         BluetoothGattID mGattID;
         byte mIfaceID;
@@ -359,6 +364,52 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.mGattID = mGattID;
             this.mIfaceID = mIfaceID;
             this.mCallback = mCallback;
+            knownApps.add(this);
+        }
+    }
+    
+
+    /**
+     * Internal class that allows to map connection ids with remote address,
+     * application wrapper and gatttool instance.
+     */
+    private class ConnectionWrapper {
+        int connID;
+        boolean deviceBR;
+        AppWrapper wrapper;
+        String remote;
+        GattToolWrapper mGattTool;
+        Map<BleGattID, List<Service>> services;
+        BleGattID lastPrimaryUuid;
+        Service lastService;
+        Map<Integer, Service> mServiceByHandle = new HashMap<Integer, Service>();
+        Map<Integer, Characteristic> mCharacteristicByHandle = new HashMap<Integer, Characteristic>();
+        Map<Integer, Attribute> mAttributesByHandle = new HashMap<Integer, Attribute>();
+        
+        public ConnectionWrapper(AppWrapper w, String r) {
+            this.connID = -1; // mark as pending
+            this.wrapper = w;
+            this.remote = r;
+            this.services = new HashMap<BleGattID, List<Service>>();
+            this.lastPrimaryUuid = null;
+            this.deviceBR = false;
+        }
+        
+        public Service addService(int start, int end, BleGattID uuid){
+            if (!services.containsKey(uuid))
+                services.put(uuid, new Vector<Service>());
+            
+            int sid = services.get(uuid).size();
+            int u16 = uuid.getUuid16();
+            BluetoothGattID svcId;
+            if (u16 > -1)
+                svcId = new BluetoothGattID(sid, u16);
+            else
+                svcId = new BluetoothGattID(sid, uuid.getUuid());
+            Service s = new Service(svcId, start, end);
+            services.get(uuid).add(s);
+            s.conn = this;
+            return s;
         }
     }
 
@@ -374,7 +425,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         List<Characteristic> chars = new Vector<Characteristic>();
         Characteristic lastChar = null;
         Integer lastCharResult = null;
-        
+        ConnectionWrapper conn;
+       
         IBleCharacteristicDataCallback callback;
         
         public Service(BluetoothGattID u, int s, int e){
@@ -390,13 +442,17 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.chars.add(c);
             if (chars.size()>1)
                 chars.get(c.uuid.getInstanceID()-1).end = c.handle-1;
+            
         }
     }
     
-    @SuppressWarnings("unused")
-    private class Characteristic {
-        int handle;
+    private class Attribute {
+    	int handle;
         BleGattID uuid;
+    }
+    
+    @SuppressWarnings("unused")
+    private class Characteristic extends Attribute{
         short properties;
         int value_handle;
         int end = 0xffff;
@@ -421,38 +477,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
     
     @SuppressWarnings("unused")
-    private class Descriptor {
-        int handle;
-        BleGattID uuid;
+    private class Descriptor extends Attribute{
         Characteristic parent;
         
         public Descriptor(int handle, BleGattID uuid){
             this.handle = handle;
             this.uuid = uuid;
-        }
-    }
-    
-    /**
-     * Internal class that allows to map connection ids with remote address,
-     * application wrapper and gatttool instance.
-     */
-    private class ConnectionWrapper {
-        int connID;
-        boolean deviceBR;
-        AppWrapper wrapper;
-        String remote;
-        GattToolWrapper mGattTool;
-        Map<BleGattID, List<Service>> services;
-        BleGattID lastPrimaryUuid;
-        Service lastService;
-        
-        public ConnectionWrapper(AppWrapper w, String r) {
-            this.connID = -1; // mark as pending
-            this.wrapper = w;
-            this.remote = r;
-            this.services = new HashMap<BleGattID, List<Service>>();
-            this.lastPrimaryUuid = null;
-            this.deviceBR = false;
         }
     }
 
@@ -813,7 +843,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * Method called by binder clients to start a service discovery process
      */
-    public synchronized void searchService(final int connID, final BluetoothGattID serviceID) {
+    public synchronized void searchService(int connID, BluetoothGattID serviceID) {
         Log.v(TAG, "searchService " + connID + " " + serviceID);
         
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "searchService");
@@ -862,20 +892,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         if (cw == null)
             return;
         
-        if (!cw.services.containsKey(uuid))
-            cw.services.put(uuid, new Vector<Service>());
-        
-        int sid = cw.services.get(uuid).size();
-        int u16 = uuid.getUuid16();
-        BluetoothGattID svcId;
-        if (u16 > -1)
-            svcId = new BluetoothGattID(sid, u16);
-        else
-            svcId = new BluetoothGattID(sid, uuid.getUuid());
-        Service s = new Service(svcId, start, end);
-        cw.services.get(uuid).add(s);
+        Service s = cw.addService(start, end, uuid);
         try {
-            cw.wrapper.mCallback.onSearchResult(connID, svcId);
+            cw.wrapper.mCallback.onSearchResult(connID, s.uuid);
         } catch (Exception e) {
             Log.e(TAG, "exception will calling onSearchResult");
         }
@@ -1460,16 +1479,108 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     }
     
+    private List<NotificationListener> mListener = new Vector<NotificationListener>();
+    
+    class NotificationListener {
+    	AppWrapper appWrapper;
+    	String address;
+    	BluetoothGattCharID uuid;
+    	boolean enabled;
+    	
+    	public NotificationListener(AppWrapper w, String a, BluetoothGattCharID u){
+    		this.appWrapper = w;
+    		this.address = a;
+    		this.uuid = u;
+    		this.enabled = false;
+    		mListener.add(this);
+    	}
+    }
+    
     @Override
-    public boolean registerForNotifications(byte ifaceID, String address,
+    public synchronized boolean registerForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) {
-    	return false;
+    	Log.v(TAG, "registerForNotification " + ifaceID + ", " + address + ", " + charID);
+    	AppWrapper a = null;
+    	
+    	for (AppWrapper b: knownApps){
+    		if (b.mIfaceID == ifaceID)
+    			a = b;
+    	}
+    	
+    	if (a == null) {
+    		Log.v(TAG, "app not known can't register");
+    		return false;
+    	}
+    	
+    	NotificationListener n = new NotificationListener(a, address, charID);
+    	n.enabled = true;
+    	
+    	return true;
     }
 
     @Override
-    public boolean deregisterForNotifications(byte interfaceID, String address,
+    public synchronized boolean deregisterForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) {
-    	return false;
+    	Log.v(TAG, "deregisterForNotifications " + ifaceID);
+    	NotificationListener a = null;
+    	for (NotificationListener n: mListener){
+    		if (n.appWrapper.mIfaceID == ifaceID)
+    			a = n;
+    	}
+    	if (a == null){
+    		Log.v(TAG, "not known app id");
+    		return false;
+    	}
+    	
+    	a.enabled = false;
+    	return true;
+    }
+    
+    @Override
+    public synchronized void onNotification(int conn_handle, int handle, byte[] value) {
+        Log.v(TAG, "onNotification " + conn_handle + toIntHexString(handle));
+        
+        ConnectionWrapper conn = getConnectionWrapperForConnID(conn_handle, "onNotification");
+        
+        if (conn == null){
+        	Log.e(TAG, "no connection wrapper can't do much at onNotification");
+        	return;
+        }
+        
+        String remote = conn.remote;
+        
+        Log.v(TAG, "looking for notification handlers for " + remote );
+        
+        for (NotificationListener nl: mListener){
+        	if (!nl.address.toLowerCase().equals(remote.toLowerCase()))
+        		continue;
+        	Log.v(TAG, "found a connection wrapper for this address");
+        	if (!nl.enabled){
+        		Log.v(TAG, "disabled ignoring");
+        		continue;
+        	}
+        	for (Map.Entry<BleGattID, List<Service>> e: conn.services.entrySet()){
+        		for (Service s: e.getValue()){
+        			for (Characteristic characteristic: s.chars){
+        				if (characteristic.handle == handle || characteristic.value_handle == handle){
+        					Log.v(TAG, "found handle match!");
+        					if (!nl.uuid.equals(characteristic.uuid)) {
+        						Log.v(TAG, "uuid missmatch");
+        						continue;
+        					}
+        					try {
+								s.callback.onNotify(conn_handle, remote, s.uuid, characteristic.uuid, 
+										true, value);
+							} catch (RemoteException e1) {
+								Log.v(TAG, "error while doing onNotify", e1);
+							}
+        				}
+        			}
+        		}
+        	}
+        }
+        
+        this.notifyAll();
     }
 
     @Override
@@ -1723,13 +1834,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         // TODO Auto-generated method stub
         System.exit(0);
 
-    }
-
-    @Override
-    public synchronized void onNotification(int conn_handle, int handle, byte[] value) {
-        // TODO Auto-generated method stub
-        Log.v(TAG, "onNotification");
-        this.notifyAll();
     }
 
     @Override
