@@ -836,15 +836,15 @@ public abstract class BleClientService
 
             if (descriptorID.getUuidType() == BleConstants.GATT_UUID_TYPE_128) {
                 String uuid128 = descriptorID.getUuid().toString();
-                if (uuid128.equals("00002900-0000-1000-8000-00805f9b34fb"))
+                if (uuid128.equals(BleConstants.GATT_UUID_CHAR_EXT_PROP))
                     characteristic.addDescriptor(new BleExtProperty());
-                else if (uuid128.equals("00002902-0000-1000-8000-00805f9b34fb"))
+                else if (uuid128.equals(BleConstants.GATT_UUID_CHAR_CLIENT_CONFIG))
                     characteristic.addDescriptor(new BleClientConfig());
-                else if (uuid128.equals("00002903-0000-1000-8000-00805f9b34fb"))
+                else if (uuid128.equals(BleConstants.GATT_UUID_CHAR_SRVR_CONFIG))
                     characteristic.addDescriptor(new BleServerConfig());
-                else if (uuid128.equals("00002904-0000-1000-8000-00805f9b34fb"))
+                else if (uuid128.equals(BleConstants.GATT_UUID_CHAR_PRESENT_FORMAT))
                     characteristic.addDescriptor(new BlePresentationFormat());
-                else if (uuid128.equals("00002901-0000-1000-8000-00805f9b34fb"))
+                else if (uuid128.equals(BleConstants.GATT_UUID_CHAR_DESCRIPTION))
                     characteristic.addDescriptor(new BleUserDescription());
                 else
                     characteristic.addDescriptor(new BleDescriptor(new BleGattID(
