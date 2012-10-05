@@ -401,6 +401,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         short properties;
         int value_handle;
         int end = 0xffff;
+        boolean descFlag;
         Service service;
         Descriptor lastDescriptor;
         Integer lastDescriptorStatus = null;
@@ -503,6 +504,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
 
         this.notifyAll();
+        Log.v(TAG, "connected end");
     }
 
     @Override
@@ -550,6 +552,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 this.wait();
             } catch (InterruptedException e) {
             }
+        Log.v(TAG, "open end");
     }
 
     @Override
@@ -849,6 +852,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.services.clear();
             gatt.primaryDiscovery();
         }
+        Log.v(TAG, "searchService end");
     }
     
     @Override
@@ -995,29 +999,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         s.chars.clear();
         
         cw.mGattTool.characteristicsDiscovery(s.start, s.end);
-        
-        while (s.lastCharResult == null)
-            try {
-                Log.v(TAG, "waiting for lastCharResult to stop been null");
-                this.wait(1000);
-            } catch (InterruptedException e) {
-                Log.e(TAG, "interrupted while waiting for characteristics discovery to complete", e);
-            }
-        
-        Log.v(TAG, "lastCharResult is no longer null");
-        try {
-            if (s.chars.size() > 0) {
-                Characteristic c = s.chars.get(0);
-                s.callback.onGetFirstCharacteristic(connID, s.lastCharResult.intValue(), 
-                        serviceID, c.uuid, c.properties);
-            }
-            else
-                s.callback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND, 
-                        serviceID, null, 0);
-            s.lastCharResult = null;
-        } catch (RemoteException e) {
-            Log.e(TAG, "error while calling onGetFirstCharacteristic", e);
-        }
+        Log.v(TAG, "getFirstChar end");
     }
     
     @Override
@@ -1048,12 +1030,33 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             return;
         Service s = cw.lastService;
         s.lastCharResult = new Integer(status);
+        
+        try {
+            if (s.chars.size() > 0) {
+                Characteristic c = s.chars.get(0);
+                Log.v(TAG, "doing onGetFirstCharacteristic " + connID + " " + s.uuid + " " +
+                        c.uuid + " " + c.properties);
+                s.callback.onGetFirstCharacteristic(connID, s.lastCharResult.intValue(), 
+                        s.uuid, c.uuid, c.properties);
+            }
+            else {
+                s.callback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND, 
+                        s.uuid, null, 0);
+                Log.v(TAG, "doing onGetFirstCharacteristic " + connID + " " + s.uuid + " " +
+                        null + " " + 0);
+            }
+            s.lastCharResult = null;
+        } catch (RemoteException e) {
+            Log.e(TAG, "error while calling onGetFirstCharacteristic", e);
+        }
+        
+        Log.v(TAG, "characteristicEnd finish");
         this.notifyAll();
     }
     
     @Override
     public synchronized void getNextChar(int connID, BluetoothGattCharID svcChrID, BluetoothGattID id) {
-        Log.v(TAG, "getFirstChar " + connID + " " + svcChrID + " " + id);
+        Log.v(TAG, "getNextChar " + connID + " " + svcChrID + " " + id);
         BluetoothGattID serviceID = svcChrID.getSrvcId();
         BluetoothGattID prevChar = svcChrID.getCharId();
         
@@ -1121,25 +1124,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         s.lastChar = c;
         c.lastDescriptor = null;
         cw.mGattTool.characteristicsDescriptorDiscovery(c.handle, c.end);
-        
-        while (c.lastDescriptorStatus == null)
-        try {
-            this.wait();
-        } catch (InterruptedException e) {
-            Log.e(TAG, "interrupted while waiting for characteristicDescriptorDiscovery to complete");
-        }
-        
-        BleGattID uuid = null;
-        
-        if (c.descriptors.size() > 0)
-            uuid = c.descriptors.get(0).uuid;
-
-        try {
-            s.callback.onGetFirstCharacteristicDescriptor(connID, c.lastDescriptorStatus, 
-                    serviceID, charID, uuid);
-        } catch (RemoteException e) {
-            Log.e(TAG, "error while onGetFirstCharacteristicDescriptor");
-        }
     }
     
     @Override
@@ -1154,6 +1138,10 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         if (s == null) return;
         Characteristic c = s.lastChar;
         if (c == null) return;
+        if (c.lastDescriptorStatus!=null){
+            Log.v(TAG, "ignoring spurious descriptor");
+            return;
+        }
         c.addDescriptor(new Descriptor(handle, uuid));
         Log.v(TAG, "added char-desc");
     }
@@ -1163,21 +1151,40 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * GattToolWrapper callback called when descriptor discovery ended.
      */
     public synchronized void characteristicDescriptorEnd(int connID, int status) {
-        Log.v(TAG, "characteristicDescriptorEnd " + connID + " " + status);
-        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstCharDescr");
-        if (cw == null) return;
+        Log.v(TAG, "characteristicEnd " + connID + " " + status);
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicDescriptorEnd callback");
+        if ( cw == null || cw.lastService == null || cw.lastService.lastChar == null){
+            Log.e(TAG, "either ConnectionWrapper, lastService or lastChar are null ignoring");
+            return;
+        }
         Service s = cw.lastService;
-        if (s == null) return;
         Characteristic c = s.lastChar;
-        if (c == null) return;
+        
+        if (c.lastDescriptorStatus!=null){
+            Log.v(TAG, "ignoring spurious descriptor end");
+            return;
+        }
+        
         c.lastDescriptorStatus = status;
-        this.notifyAll();
+        
+        BleGattID uuid = null;
+        
+        if (c.descriptors.size() > 0)
+            uuid = c.descriptors.get(0).uuid;
+
+        try {
+            s.callback.onGetFirstCharacteristicDescriptor(connID, status, 
+                    s.uuid, c.uuid, uuid);
+        } catch (RemoteException e) {
+            Log.e(TAG, "error while onGetFirstCharacteristicDescriptor");
+        }
     }
 
     @Override
     public void getNextCharDescr(int connID, BluetoothGattCharDescrID charDescrID,
             BluetoothGattID id) {
-        Log.v(TAG, "getFirstCharDescr " + connID + " " + charDescrID + " " + id);
+        Log.v(TAG, "getNextCharDescr " + connID + " " + charDescrID + " " + id);
         BluetoothGattID serviceID = charDescrID.getSrvcId();
         BluetoothGattID charID = charDescrID.getCharId();
         BluetoothGattID descID = charDescrID.getDescrId();
@@ -1190,7 +1197,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             return;
         }
         
-        Characteristic c = getCharacteristicFromService(s, charID, "getFirstCharDescr");
+        Characteristic c = getCharacteristicFromService(s, charID, "getNextCharDescr");
         if (c == null)
             return;    
                 
@@ -1200,6 +1207,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             uuid = c.descriptors.get(descID.getInstanceID()+1).uuid;
 
         try {
+            Log.v(TAG, "doing onGetNextCharacteristicDescriptor with uuid: " + uuid);
             s.callback.onGetNextCharacteristicDescriptor(connID, 
                     uuid != null ? BleConstants.GATT_SUCCESS : BleConstants.GATT_ERROR, 
                             serviceID, charID, uuid);
@@ -1300,12 +1308,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         if (c.lastDescriptor != null) {
             Descriptor d = c.lastDescriptor;
             try {
+                Log.v(TAG, "calling onReadCharDescriptorValue " + status + " " + d.uuid);
                 s.callback.onReadCharDescriptorValue(connID, status, s.uuid, c.uuid, d.uuid, value);
             } catch (RemoteException e) {
                 Log.e(TAG, "error when calling onReadCharDescriptorValue", e);
             }
         } else {
             try {
+                Log.v(TAG, "calling onReadCharacteristicValue");
                 s.callback.onReadCharacteristicValue(connID, status, s.uuid, c.uuid, value);
             } catch (RemoteException e) {
                 Log.e(TAG, "error when calling onReadCharacteristicValue", e);
@@ -1595,20 +1605,23 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             BluetoothGattCharID charID) {
         Log.i(TAG,
                 "registering for notifications from " + address + " for uuid " + charID.getCharId());
+        
+        
+        return false;
 
-        ServiceWrapper ser = getServiceWrapper(address);
-        if (ser == null || ser.mCallback == null)
-            return false;
+        //ServiceWrapper ser = getServiceWrapper(address);
+        //if (ser == null || ser.mCallback == null)
+        //    return false;
 
-        int ret = internalRegisterForNotifications(ser, ifaceID, address, charID);
+        //int ret = internalRegisterForNotifications(ser, ifaceID, address, charID);
 
-        try {
-            ser.mCallback.onRegForNotifications(-1, ret, charID.getSrvcId(), charID.getCharId());
-        } catch (RemoteException e) {
-            Log.e(TAG, "failed during onRegForNotifications ret: " + ret);
-        }
+        //try {
+        //    ser.mCallback.onRegForNotifications(-1, ret, charID.getSrvcId(), charID.getCharId());
+        //} catch (RemoteException e) {
+        //    Log.e(TAG, "failed during onRegForNotifications ret: " + ret);
+        //}
 
-        return ret == BleConstants.GATT_SUCCESS;
+        //return ret == BleConstants.GATT_SUCCESS;
     }
 
     @Override
