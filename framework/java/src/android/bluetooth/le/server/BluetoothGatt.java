@@ -1501,22 +1501,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private Map<String, ServiceWrapper> mRemoteServices = new HashMap<String, ServiceWrapper>();
 
     @Override
-    public void serviceDiscovered(int connID, String address, String uuid, String path) {
-       Log.e(TAG, "ignoring serviceDiscovered");
-    }
-
-    @Override
-    public void serviceDiscoveredFinished(int connID, int status) {
-        Log.e(TAG, "ignoring serviceDiscoveredFinished");
-    }
-
-    @Override
-    public void characteristicsSolved(int connID, String serPath, List<Path> chars,
-            List<BluetoothGattID> uuids) {
-    	Log.e(TAG, "ignoring characteristicSolved");
-    }
-
-    @Override
     public int getApiLevel() {
         return API_LEVEL;
     }
@@ -1774,11 +1758,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
-    public void valueChanged(String path, byte[] val) {
-       Log.e(TAG, "ignoring valueChanged");
-    }
-
-    @Override
     public synchronized void onNotification(int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
         Log.v(TAG, "onNotification");
@@ -1845,5 +1824,33 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         // TODO Auto-generated method stub
         Log.v(TAG, "shellError");
         this.notifyAll();
+    }
+    
+    //
+    // The following methods are inherited from BlueZInterface.Listener
+    // they should be dropped once we get all working with gatttool-btle
+    // TODO: drop this completly!.
+    //
+    
+    @Override
+    public void serviceDiscovered(int connID, String address, String uuid, String path) {
+       Log.e(TAG, "ignoring serviceDiscovered");
+    }
+
+    @Override
+    public void serviceDiscoveredFinished(int connID, int status) {
+        Log.e(TAG, "ignoring serviceDiscoveredFinished");
+    }
+
+    @Override
+    public void characteristicsSolved(int connID, String serPath, List<Path> chars,
+            List<BluetoothGattID> uuids) {
+    	Log.e(TAG, "ignoring characteristicSolved");
+    }
+    
+
+    @Override
+    public void valueChanged(String path, byte[] val) {
+       Log.e(TAG, "ignoring valueChanged");
     }
 }
