@@ -1521,53 +1521,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     @Override
     public boolean registerForNotifications(byte ifaceID, String address,
             BluetoothGattCharID charID) {
-        Log.i(TAG,
-                "registering for notifications from " + address + " for uuid " + charID.getCharId());
-        
-        
-        return false;
-
-        //ServiceWrapper ser = getServiceWrapper(address);
-        //if (ser == null || ser.mCallback == null)
-        //    return false;
-
-        //int ret = internalRegisterForNotifications(ser, ifaceID, address, charID);
-
-        //try {
-        //    ser.mCallback.onRegForNotifications(-1, ret, charID.getSrvcId(), charID.getCharId());
-        //} catch (RemoteException e) {
-        //    Log.e(TAG, "failed during onRegForNotifications ret: " + ret);
-        //}
-
-        //return ret == BleConstants.GATT_SUCCESS;
+    	return false;
     }
 
     @Override
     public boolean deregisterForNotifications(byte interfaceID, String address,
             BluetoothGattCharID charID) {
-
-        if (!mNotificationListener.containsKey(address)) {
-            Log.e(TAG, "deregisterForNotifications for non registered remote device");
-            return false;
-        }
-
-        Log.i(TAG, "unregistering " + address + " from notifications");
-        Vector<Integer> r = new Vector<Integer>();
-        int i = 0;
-        for (BluetoothGattCharID c : mNotificationListener.get(address)) {
-            if (c.equals(charID)) {
-                Log.v(TAG, "unregistering");
-                r.add(i);
-            }
-            i++;
-        }
-
-        for (Integer I : r) {
-            mNotificationListener.get(address).remove(I);
-        }
-        Log.v(TAG, "removed " + r.size() + " listeners");
-
-        return r.size() > 0;
+    	return false;
     }
 
     @Override
