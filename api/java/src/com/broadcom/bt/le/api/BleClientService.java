@@ -395,6 +395,8 @@ public abstract class BleClientService
     {
         int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "registerForNotification address: " + remoteDevice.getAddress());
+        if (true)
+            return -1;
         try {
             BleGattID svcId = new BleGattID(instanceID, getServiceId().getUuid(),
                     getServiceId().getServiceType());
@@ -416,6 +418,8 @@ public abstract class BleClientService
     {
         int ret = BleConstants.GATT_SUCCESS;
         Log.d(TAG, "unregisterNotification address: " + remoteDevice.getAddress());
+        if (true)
+            return -1;
         try {
             BleGattID svcId = new BleGattID(instanceID, getServiceId().getUuid(),
                     getServiceId().getServiceType());
@@ -1045,8 +1049,8 @@ public abstract class BleClientService
         public void onReadCharDescriptorValue(int connID, int status, BluetoothGattID svcId,
                 BluetoothGattID characteristicID, BluetoothGattID descr, byte[] data)
         {
-            Log.d(BleClientService.TAG, "onReadCharacteristicExtProp charID = "
-                    + characteristicID.toString() + " status = " + status);
+            Log.d(BleClientService.TAG, "onReadCharDescriptorValue svcID = "
+                    + svcId + " CharID = " + characteristicID + " descID = "  + descr + " status = " + status);
 
             BleDescriptor d = findDescriptor(connID, BleApiHelper.gatt2BleID(svcId),
                     BleApiHelper.gatt2BleID(characteristicID), BleApiHelper.gatt2BleID(descr));
@@ -1054,6 +1058,7 @@ public abstract class BleClientService
             BleCharacteristic c = findCharacteristic(connID,
                     BleApiHelper.gatt2BleID(svcId), BleApiHelper.gatt2BleID(characteristicID));
 
+            
             if (d != null)
                 if (status == 0) {
                     d.setValue(data);
@@ -1179,22 +1184,17 @@ public abstract class BleClientService
                 BleGattID descriptorID)
         {
             Log.d(BleClientService.TAG,
-                    "findCharacteristic charID = [" + characteristicID.toString()
-                            + "] instance ID = [" + characteristicID.getInstanceID() + "]");
+                    "findDescriptor charID = " + characteristicID.toString()
+                            + ":" + characteristicID.getInstanceID() + 
+                            ", descID = "  + descriptorID.toString() + 
+                            ":" + descriptorID.getInstanceID());
 
             ServiceData s = BleClientService.this.getServiceData(
                     BleClientService.this.mProfile.getDeviceforConnId(connID),
                     svcId.getInstanceID());
 
-            BleCharacteristic charObj = null;
-            for (int i = 0; i < s.characteristics.size(); i++) {
-                BleCharacteristic c = s.characteristics.get(i);
-
-                if (c.getID().equals(characteristicID.getUuid())) {
-                    Log.d(BleClientService.TAG, "findCharacteristic - found");
-                    charObj = c;
-                }
-            }
+            BleCharacteristic charObj = findCharacteristic(connID, svcId, characteristicID);
+                    
             if (charObj != null) {
                 for (int i = 0; i < charObj.getAllDescriptors().size(); i++) {
                     BleDescriptor d = charObj.getAllDescriptors().get(i);
@@ -1205,6 +1205,7 @@ public abstract class BleClientService
                 }
             }
 
+            Log.v(TAG, "no descriptor match");
             return null;
         }
 
