@@ -34,7 +34,7 @@ public class BluetoothGattID
     private int mUuid16 = -1;
     private int mType = -1;
     private int mServiceType = -1;
-    protected static final String TAG = "BluetoothGattID";
+    private static final String TAG = "BluetoothGattID";
     
     @SuppressWarnings({"unchecked", "rawtypes"})
     
@@ -243,8 +243,8 @@ public class BluetoothGattID
         }
         
         if (!(target instanceof BluetoothGattID)) {
-            Log.v(TAG, "wrong instance");
-            return false;
+            Log.v(TAG, "wrong instance, comparing string level");
+            return this.toString().toLowerCase().equals(target.toString().toLowerCase());
         }
 
         BluetoothGattID targetId = (BluetoothGattID) target;
