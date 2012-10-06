@@ -87,7 +87,13 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 				}
 			}
 		}
-		Log.e(TAG, "no more workers available");
+		Log.e(TAG, "no more workers available creating one");
+		try {
+			GattToolWrapper w = new GattToolWrapper();
+			return w;
+		} catch (IOException e) {
+			Log.e(TAG, "failed to create new wrapper", e);
+		}
 		return null;
 	}
 
