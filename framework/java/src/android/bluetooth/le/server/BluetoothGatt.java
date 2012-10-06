@@ -351,13 +351,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * Internal class used to wrap all the information needed to talk to binder
      * clients.
      */
-    @SuppressWarnings("unused")
     private Set<AppWrapper> knownApps = new HashSet<AppWrapper>();
     
     class AppWrapper {
         BluetoothGattID mGattID;
         byte mIfaceID;
         IBleClientCallback mCallback;
+        DeathRecipient deadRecipient;
 
         public AppWrapper(BluetoothGattID mGattID, byte mIfaceID, IBleClientCallback mCallback) {
             super();
@@ -365,6 +365,51 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.mIfaceID = mIfaceID;
             this.mCallback = mCallback;
             knownApps.add(this);
+        }
+        
+        private synchronized void cleanupApp(){
+        	Log.v(TAG, "cleaning up application " + mIfaceID);
+            for (Map.Entry<String, ConnectionWrapper> cm: mPendingConnections.entrySet()){
+            	ConnectionWrapper cw = cm.getValue();
+            	if (cw.wrapper.mIfaceID != mIfaceID)
+            		continue;
+            	Log.v(TAG, "dropping pending connection from this client " + cm.getKey());
+            	cw.mGattTool.setListener(null);
+            	cw.mGattTool.disconnect();
+            	cw.mGattTool.releaseWorker();
+            	mPendingConnections.remove(cm.getKey());
+            }
+            for (Map.Entry<Integer, ConnectionWrapper> cm: mConnectionMap.entrySet()){
+            	ConnectionWrapper cw = cm.getValue();
+            	if (cw.wrapper.mIfaceID != mIfaceID)
+            		continue;
+            	Log.v(TAG, "dropping open client from this client " + cw.remote);
+            	cw.mGattTool.setListener(null);
+            	cw.mGattTool.disconnect();
+            	cw.mGattTool.releaseWorker();
+            	for (Service s: cw.mServiceByHandle.values()){
+            		for (Characteristic c: s.chars){
+            			c.descriptors.clear();
+            			c.service = null;
+            		}
+            		s.chars.clear();
+            		s.callback = null;
+            	}
+            	cw.mServiceByHandle.clear();
+            	cw.mAttributesByHandle.clear();
+            	cw.mCharacteristicByHandle.clear();
+            	mConnectionMap.remove(cm.getKey());
+            }
+            if (deadRecipient!=null) {
+            	boolean r = mCallback.asBinder().
+            			unlinkToDeath(deadRecipient, 0);
+            	if (!r)
+            		Log.e(TAG, "unlinkToDeath failed");
+            }
+            deadRecipient = null;
+            knownApps.remove(this);
+            registeredAppsByID[this.mIfaceID] = null;
+            Log.v(TAG, "AppWrapper for " + this.mIfaceID + " cleaned");
         }
     }
     
@@ -668,9 +713,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     /* *******************************************************************************
      * Application handling methods
-     * **********************************************
      * ********************************
      */
+    private boolean isApplicationAlive(AppWrapper wrapper){
+    	return wrapper.mCallback.asBinder().pingBinder();
+    }
+    
     @Override
     /**
      * This method will get called when ever a new BLE application starts running.
@@ -683,7 +731,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Log.v(TAG, "uuid all ready registered");
 
             wrapper = registeredApps.get(appUuid);
-            if (wrapper.mCallback.asBinder().pingBinder()) {
+            if (isApplicationAlive(wrapper)) {
                 Log.e(TAG, "uuid is registered and alive");
                 try {
                     callback.onAppRegistered((byte) BleConstants.GATT_ERROR, (byte) -1);
@@ -693,6 +741,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 return;
             }
             Log.v(TAG, "no ping back " + appUuid + " registering again");
+            wrapper.cleanupApp();
         }
         int status = BleConstants.GATT_SUCCESS;
 
@@ -710,7 +759,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             this.registeredAppsByID[wrapper.mIfaceID] = wrapper;
             registeredApps.put(appUuid, wrapper);
             ifaceID = wrapper.mIfaceID;
+            final AppWrapper w = wrapper;
+            DeathRecipient dr = new DeathRecipient() {
+            	public void binderDied() {
+					Log.e(TAG, "application died without calling unregisterApp first " + w.mIfaceID);
+					w.cleanupApp();
+				}
+            };
+            w.deadRecipient = dr;
+            try {
+				callback.asBinder().linkToDeath(dr, 0);
+			} catch (RemoteException e) {
+				Log.e(TAG, "failed to do linkToDeath");
+			}
         }
+        
+
 
         try {
             callback.onAppRegistered((byte) status, ifaceID);
@@ -730,33 +794,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             if (a.mIfaceID != interfaceID)
                 continue;
 
-            for (Entry<String, ConnectionWrapper> e : mPendingConnections.entrySet()) {
-                ConnectionWrapper cw = e.getValue();
-                if (cw.wrapper != a)
-                    continue;
-                Log.v(TAG, "canceling connection for " + e.getKey());
-                if (cw.mGattTool != null)
-                    cw.mGattTool.disconnect();
-                cw.mGattTool.setListener(null);
-                cw.mGattTool.releaseWorker();
-                cw.mGattTool = null;
-                mPendingConnections.remove(e.getKey());
-            }
-
-            for (Entry<Integer, ConnectionWrapper> e : mConnectionMap.entrySet()) {
-                ConnectionWrapper cw = e.getValue();
-                if (cw.wrapper != a)
-                    continue;
-                Log.v(TAG, "forcing connection close for " + e.getKey());
-                if (cw.mGattTool != null)
-                    cw.mGattTool.disconnect();
-                cw.mGattTool.setListener(null);
-                cw.mGattTool.releaseWorker();
-                cw.mGattTool = null;
-                mConnectionMap.remove(e.getKey());
-            }
-
-            registeredApps.remove(v.getKey());
+            a.cleanupApp();
             try {
                 a.mCallback.onAppDeregistered(interfaceID);
             } catch (RemoteException e) {
