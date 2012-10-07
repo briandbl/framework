@@ -568,6 +568,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.v(TAG, "connected " + addr + " -> " + conn_handle + " " + status);
         if (!mPendingConnections.containsKey(addr)) {
             Log.e(TAG, "remote no longer pending!");
+            this.notifyAll();
             return;
         }
 
@@ -579,15 +580,17 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         try {
             if (status == BleConstants.GATT_SUCCESS) {
                 mConnectionMap.put(conn_handle, cw);
+                this.notifyAll();
                 cw.wrapper.mCallback.onConnected(addr, conn_handle);
             }
-            else
+            else {
+            	this.notifyAll();
                 cw.wrapper.mCallback.onDisconnected(conn_handle, addr);
+            }
         } catch (RemoteException e) {
             Log.e(TAG, "failed calling callback from connection wrapper", e);
         }
 
-        this.notifyAll();
         Log.v(TAG, "connected end");
     }
 
@@ -657,18 +660,18 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             mConnectionMap.remove(addr);
         } else {
             Log.e(TAG, "Address is not registered as pending or connected, aborting");
+            this.notifyAll();
             return;
         }
         cw.mGattTool.setListener(null); // stop getting signals
         cw.mGattTool.releaseWorker();
-
+        
+        this.notifyAll();
         try {
             cw.wrapper.mCallback.onDisconnected(conn_handle, addr);
         } catch (RemoteException e) {
             Log.e(TAG, "failed calling callback from connection wrapper", e);
         }
-
-        this.notifyAll();
     }
 
     @Override
@@ -928,6 +931,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.services.clear();
             gatt.primaryDiscovery();
         }
+        try {
+			this.wait();
+		} catch (InterruptedException e) {
+			Log.e(TAG, "interrupted on SearchService");
+		}
         Log.v(TAG, "searchService end");
     }
     
@@ -953,16 +961,19 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * GattToolWrapper callback to let us know the primary scan completed.
      */
     public synchronized void primaryAllEnd(int connID, int status) {
-        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryAllEnd");
-        if (cw == null)
-            return;
         
+    	ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryAllEnd");
+        if (cw == null){
+            this.notifyAll();
+        	return;
+        }
+        
+        this.notifyAll();
         try {
             cw.wrapper.mCallback.onSearchCompleted(connID, status);
         } catch (Exception e) {
             Log.e(TAG, "exception will calling onSearchCompleted");
         }
-        this.notifyAll();
     }
 
     /**
@@ -1065,6 +1076,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         s.chars.clear();
         
         cw.mGattTool.characteristicsDiscovery(s.start, s.end);
+        
+        try {
+			this.wait();
+		} catch (InterruptedException e) {
+			Log.e(TAG, "getFirstChar interrupted");
+		}
+        
         Log.v(TAG, "getFirstChar end");
     }
     
@@ -1092,8 +1110,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Log.v(TAG, "characteristicEnd " + connID + " " + status);
         
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicEnd callback");
-        if ( cw == null || cw.lastService == null)
-            return;
+        if ( cw == null || cw.lastService == null) {
+        	this.notifyAll();
+        	return;
+        }
+        
         Service s = cw.lastService;
         s.lastCharResult = new Integer(status);
         
@@ -1102,10 +1123,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 Characteristic c = s.chars.get(0);
                 Log.v(TAG, "doing onGetFirstCharacteristic " + connID + " " + s.uuid + " " +
                         c.uuid + " " + c.properties);
+                this.notifyAll();
                 s.callback.onGetFirstCharacteristic(connID, s.lastCharResult.intValue(), 
                         s.uuid, c.uuid, c.properties);
             }
             else {
+                this.notifyAll();
                 s.callback.onGetFirstCharacteristic(connID, BleConstants.GATT_NOT_FOUND, 
                         s.uuid, null, 0);
                 Log.v(TAG, "doing onGetFirstCharacteristic " + connID + " " + s.uuid + " " +
@@ -1117,7 +1140,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         }
         
         Log.v(TAG, "characteristicEnd finish");
-        this.notifyAll();
     }
     
     @Override
@@ -1183,6 +1205,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Characteristic c = getCharacteristicFromService(s, charID, "getFirstCharDescr");
         if (c == null) {
         	try {
+        		Log.v(TAG, "no characteristic, can't do anythng");
 				s.callback.onGetFirstCharacteristicDescriptor(connID, BleConstants.GATT_ERROR, serviceID, charID, null);
 			} catch (RemoteException e) {
 				Log.e(TAG, "error when doing onGetFirstCharacteristicDescriptor");
@@ -1197,7 +1220,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         if (c.end==0xffff)
             c.end=s.end;
         c.lastDescriptor = null;
+        
         cw.mGattTool.characteristicsDescriptorDiscovery(c.handle+1, c.end);
+        try {
+			this.wait();
+		} catch (InterruptedException e) {
+			Log.e(TAG, "getFirstCharDescr interrupted");
+		}  
     }
     
     @Override
@@ -1236,6 +1265,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicDescriptorEnd callback");
         if ( cw == null || cw.lastService == null || cw.lastService.lastChar == null){
             Log.e(TAG, "either ConnectionWrapper, lastService or lastChar are null ignoring");
+            this.notifyAll();
             return;
         }
         Service s = cw.lastService;
@@ -1243,6 +1273,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         
         if (c.lastDescriptorStatus!=null){
             Log.v(TAG, "ignoring spurious descriptor end");
+            this.notifyAll();
             return;
         }
         
@@ -1253,6 +1284,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         if (c.descriptors.size() > 0)
             uuid = c.descriptors.get(0).uuid;
 
+        this.notifyAll();
         try {
             s.callback.onGetFirstCharacteristicDescriptor(connID, status, 
                     s.uuid, c.uuid, uuid);
@@ -1355,6 +1387,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 s.lastChar = c;
                 c.lastDescriptor = d;
                 cw.mGattTool.readCharacteristicByHandle(d.handle);
+                try {
+                	this.wait();
+                } catch (InterruptedException e){
+                	Log.e(TAG, "interrupted on readCharDescr", e);
+                }
                 return;
         	}
     	}
@@ -1396,7 +1433,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         cw.lastService = s;
         s.lastChar = c;
         c.lastDescriptor = null;
-        cw.mGattTool.readCharacteristicByHandle(c.value_handle);    
+        cw.mGattTool.readCharacteristicByHandle(c.value_handle);
+        try {
+        	this.wait();
+        } catch (InterruptedException e){
+        	Log.e(TAG, "interrupted on readCharDescr", e);
+        }
     }
     
     @Override
@@ -1406,13 +1448,16 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     public synchronized void gotValueByHandle(int connID, byte[] value, int status) {
         Log.v(TAG, "gotValueByHandle " + connID +" " + status +" got" + value);
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "gotValueByHandle");
-        if (cw==null)
-            return;
+        if (cw==null) {
+        	this.notifyAll();
+        	return;
+        }
         Service s = cw.lastService;
         Characteristic c = s.lastChar;
+        Descriptor d = c.lastDescriptor;
         
-        if (c.lastDescriptor != null) {
-            Descriptor d = c.lastDescriptor;
+        this.notifyAll();
+        if (d != null) {
             try {
                 Log.v(TAG, "calling onReadCharDescriptorValue " + status + " " + d.uuid);
                 s.callback.onReadCharDescriptorValue(connID, status, s.uuid, c.uuid, d.uuid, value);
@@ -1432,6 +1477,39 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         c.lastDescriptor = null;
         s.lastChar = null;
         cw.lastService = null;
+    }
+    
+    @Override
+    public synchronized void gotWriteResult(int conn_handle, int status) {
+        Log.v(TAG, "gotWriteResult");
+        this.notifyAll();
+    }
+    
+    @Override
+    public synchronized void gotWriteResultReq(int connID, int status) {
+        Log.v(TAG, "gotWriteResultReq");
+        
+        Log.v(TAG, "gotWriteResultReq " + connID +" " + status);
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "gotWriteResultReq");
+        if (cw==null) {
+        	this.notifyAll();
+        	return;
+        }
+        Service s = cw.lastService;
+        Characteristic c = s.lastChar;
+        Descriptor d = c.lastDescriptor;
+        
+        this.notifyAll();
+        try {
+			if (d!=null){
+				s.callback.onWriteCharDescrValue(connID, status, s.uuid, c.uuid, d.uuid);
+			} else {
+				s.callback.onWriteCharValue(connID, status, s.uuid, c.uuid);
+			}
+		} catch (RemoteException e) {
+			Log.v(TAG, "failed to send onWriteCharDescrValue or onWriteCharValue");
+		}
+        
     }
     
     @Override
@@ -1469,6 +1547,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.lastService = s;
             s.lastChar = c;
             c.lastDescriptor = null;
+            try {
+				this.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "interrupted while writeCharValue");
+			}
         } else {
             try {
                 Log.e(TAG, "informing write couldn't start");
@@ -1513,6 +1596,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.lastService = s;
             s.lastChar = c;
             c.lastDescriptor = d;
+            try {
+				this.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "interrupted while writeCharValue");
+			}
         } else { 
             try {
                 Log.e(TAG, "informing write couldn't start");
@@ -1618,6 +1706,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         		continue;
         	}
 			try {
+				this.notifyAll();
 				a.service.callback.onNotify(conn_handle, remote, a.service.uuid, 
 						a.uuid, true, value);
 			} catch (RemoteException e1) {
@@ -1626,7 +1715,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 	
         }
         Log.v(TAG, "notification completed");
-        this.notifyAll();
     }
 
     @Override
@@ -1904,15 +1992,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
-    public synchronized void gotWriteResult(int conn_handle, int status) {
-        // TODO Auto-generated method stub
-        Log.v(TAG, "gotWriteResult");
-        this.notifyAll();
-    }
-
-    @Override
     public synchronized void gotMtuResult(int conn_handle, int status) {
-        // TODO Auto-generated method stub
         Log.v(TAG, "gotMtuResult");
         this.notifyAll();
     }
