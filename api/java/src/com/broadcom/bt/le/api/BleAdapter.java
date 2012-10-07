@@ -36,11 +36,12 @@ import com.broadcom.bt.service.gatt.IBluetoothGatt;
  * Provides helper functions and related constants to extend Bluetooth
  * functionality for the Low Energy profile.
  */
-public class BleAdapter
+public class BleAdapter implements IBinder.DeathRecipient
 {
     private static final String TAG = "BleAdapter";
     private static final boolean D = true;
 
+    private static IBinder.DeathRecipient mReceipent;
     private static IBluetoothGatt mService;
     private GattServiceConnection mSvcConn;
     private Context mContext;
@@ -96,13 +97,20 @@ public class BleAdapter
      * applies to.
      */
     public static final String EXTRA_DEVICE = "android.bluetooth.le.device.extra.DEVICE";
+    
+    /**
+     * This signal gets broadcasted when ever the BTLE service goes down for some reason.
+     */
+    public static final String ACTION_BLE_DOWN = "android.bluetooth.le.device.BLE_DOWN";
+    
 
     private static boolean startService() {
         if (mService != null)
             return true;
-        IBinder service = ServiceManager.getService(BleConstants.BLUETOOTH_LE_SERVICE);
-        if (service != null)
+        IBinder service = ServiceManager.checkService(BleConstants.BLUETOOTH_LE_SERVICE);
+        if (service != null) {
             mService = IBluetoothGatt.Stub.asInterface(service);
+        }
         return mService != null;
     }
 
@@ -114,6 +122,9 @@ public class BleAdapter
         if (startService() == false)
             throw new RuntimeException("failed connecting to service");
         this.init();
+        
+        if (mReceipent == null)
+        	mReceipent = this;
     }
 
     /**
@@ -371,5 +382,13 @@ public class BleAdapter
         }
 
     }
+
+	@Override
+	public void binderDied() {
+		Log.e(TAG, "btle-service died, broadcasting this");
+		this.mContext.sendBroadcast(new Intent(ACTION_BLE_DOWN));
+		mService = null;
+		startService();
+	}
 
 }

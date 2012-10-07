@@ -610,28 +610,35 @@ public abstract class BleClientProfile
         public void onServiceConnected(ComponentName name, IBinder service)
         {
             Log.d(TAG, "Connected to GattService!");
+            
+            if (service == null){
+            	Log.e(TAG, "no service can't go on");
+            	return;
+            }
+           
+			try {
+				BleClientProfile.this.mService = IBluetoothGatt.Stub
+						.asInterface(service);
 
-            if (service != null)
-                try {
-                    BleClientProfile.this.mService = IBluetoothGatt.Stub.asInterface(service);
+				for (int i = 0; i < BleClientProfile.this.mRequiredServices
+						.size(); i++) {
+					BleClientProfile.this.mRequiredServices.get(i).setProfile(
+							BleClientProfile.this);
+				}
 
-                    for (int i = 0; i < BleClientProfile.this.mRequiredServices.size(); i++) {
-                        BleClientProfile.this.mRequiredServices.get(i)
-                                .setProfile(BleClientProfile.this);
-                    }
+				if (BleClientProfile.this.mOptionalServices != null) {
+					for (int i = 0; i < BleClientProfile.this.mOptionalServices
+							.size(); i++) {
+						BleClientProfile.this.mOptionalServices.get(i)
+								.setProfile(BleClientProfile.this);
+					}
+				}
 
-                    if (BleClientProfile.this.mOptionalServices != null) {
-                        for (int i = 0; i < BleClientProfile.this.mOptionalServices.size(); i++) {
-                            BleClientProfile.this.mOptionalServices
-                                    .get(i).setProfile(BleClientProfile.this);
-                        }
-                    }
-
-                    BleClientProfile.this.onInitialized(true);
-                } catch (Throwable t) {
-                    Log.e(TAG, "Unable to get Binder to GattService", t);
-                    BleClientProfile.this.onInitialized(false);
-                }
+				BleClientProfile.this.onInitialized(true);
+			} catch (Throwable t) {
+				Log.e(TAG, "Unable to get Binder to GattService", t);
+				BleClientProfile.this.onInitialized(false);
+			}
         }
 
         public void onServiceDisconnected(ComponentName name)
