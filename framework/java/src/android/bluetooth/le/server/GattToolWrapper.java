@@ -305,7 +305,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 
 		if (start != null) {
 			args += IntegralToString.intToHexString(start, true, 4);
-			if (end != null) {
+			if (end != null && start.intValue() <= end.intValue()) {
 				args += " " + IntegralToString.intToHexString(end, true, 4);
 			}
 		}
@@ -610,6 +610,8 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 		public void gotValueByUuidEnd(int conn_handle, int status);
 
 		public void gotWriteResult(int conn_handle, int status);
+		
+		public void gotWriteResultReq(int conn_handle, int status);
 
 		public void gotSecurityLevelResult(int conn_handle, int status);
 

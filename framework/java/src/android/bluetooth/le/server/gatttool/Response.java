@@ -399,13 +399,26 @@ public class Response implements Cloneable{
     
     public class CharWriteResponse extends GenericEndResponse{
         public CharWriteResponse() {
-            super("CHAR-WRITE", true);
+            super("CHAR-WRITE-CMD", true);
         }
 
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
             listener.gotWriteResult(conn_handle, status);
+            return true;
+        }
+    }
+    
+    public class CharWriteReqResponse extends GenericEndResponse{
+        public CharWriteReqResponse() {
+            super("CHAR-WRITE-REQ", true);
+        }
+
+        @Override
+        protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
+                int status) {
+            listener.gotWriteResultReq(conn_handle, status);
             return true;
         }
     }
@@ -481,6 +494,7 @@ public class Response implements Cloneable{
         new CharUuidResponse();
         new CharUuidEndResponse();
         new CharWriteResponse();
+        new CharWriteReqResponse();
         new SecLevelResponse();
         new MtuResponse();
         new PsmResponse();
