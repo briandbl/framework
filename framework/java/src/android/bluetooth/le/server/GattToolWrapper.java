@@ -546,7 +546,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 			handle = Integer.parseInt(m.group(2), 16);
 			argument = m.group(3);
 
-			Log.v(TAG, "RESULT: " + command + ", " + handle + ", " + argument);
+			Log.v(TAG, "RESULT: " + command + ", " + handle + ", hash: " + this.hashCode() + ", " + argument);
 
 			if (mListener == null) {
 				Log.v(TAG,
@@ -554,7 +554,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 				return;
 			}
 
-			if (Response.processLine(this, this.mListener, command, handle,
+			if (Response.processLine(this, this.mListener, command, this.hashCode(),
 					argument))
 				return;
 		}
