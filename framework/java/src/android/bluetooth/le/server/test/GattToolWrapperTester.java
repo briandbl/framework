@@ -13,7 +13,7 @@ import java.util.Vector;
 public class GattToolWrapperTester implements GattToolListener {
 
     @Override
-    public synchronized void onNotification(int conn_handle, int handle, byte[] value) {
+    public synchronized void onNotification(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
         System.out.print("notification " + conn_handle + " " + Integer.toHexString(handle) + " ");
         if (value != null)
             for (int i = 0; i < value.length; i++)
@@ -22,7 +22,7 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void onIndication(int conn_handle, int handle, byte[] value) {
+    public synchronized void onIndication(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
         System.out.print("notification " + conn_handle + " " + Integer.toHexString(handle) + " ");
         if (value != null)
             for (int i = 0; i < value.length; i++)
@@ -31,20 +31,20 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void connected(int conn_handle, String addr, int status) {
+    public synchronized void connected(GattToolWrapper w, int conn_handle, String addr, int status) {
         System.out.println("connected to " + addr + " with handle " + conn_handle
                 + " result " + status + "\n");
         this.notifyAll();
     }
 
     @Override
-    public synchronized void disconnected(int conn_handle, String addr) {
+    public synchronized void disconnected(GattToolWrapper w, int conn_handle, String addr) {
         System.out.println("disconnected " + conn_handle + ", " + addr);
         this.notifyAll();
     }
 
     @Override
-    public void primaryAll(int conn_handle, int start, int end, BleGattID uuid) {
+    public void primaryAll(GattToolWrapper w, int conn_handle, int start, int end, BleGattID uuid) {
         System.out.println("primary: " + conn_handle 
                 + ", start: " + IntegralToString.intToHexString(start, true, 4)
                 + ", end: " + IntegralToString.intToHexString(end, true, 4) 
@@ -52,26 +52,26 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void primaryAllEnd(int conn_handle, int status) {
+    public synchronized void primaryAllEnd(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("primary completed " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public void primaryUuid(int conn_handle, int start, int end) {
+    public void primaryUuid(GattToolWrapper w, int conn_handle, int start, int end) {
         System.out.println("primary-uuid: " + conn_handle 
                 + ", start: " + IntegralToString.intToHexString(start, true, 4)
                 + ", end: " + IntegralToString.intToHexString(end, true, 4));
     }
 
     @Override
-    public synchronized void primaryUuidEnd(int conn_handle, int status) {
+    public synchronized void primaryUuidEnd(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("primary-uuid completed " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public void characteristic(int conn_handle, int handle, short properties, int value_handle,
+    public void characteristic(GattToolWrapper w, int conn_handle, int handle, short properties, int value_handle,
             BleGattID uuid) {
         System.out.println("characteristics: " + conn_handle +
                 ", start: " + IntegralToString.intToHexString(handle, true, 4) +
@@ -81,13 +81,13 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void characteristicEnd(int conn_handle, int status) {
+    public synchronized void characteristicEnd(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("characteristic-end: " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public void characteristicDescriptor(int conn_handle, int handle, BleGattID uuid) {
+    public void characteristicDescriptor(GattToolWrapper w, int conn_handle, int handle, BleGattID uuid) {
         System.out.println("characteristic-descriptor: " + conn_handle +
                 ", start: " + IntegralToString.intToHexString(handle, true, 4) +
                 ", uuid: " + uuid);
@@ -95,13 +95,13 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void characteristicDescriptorEnd(int conn_handle, int status) {
+    public synchronized void characteristicDescriptorEnd(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("characteristic-descriptor-end: " + conn_handle + ", " + status);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void gotValueByHandle(int conn_handle, byte[] value, int status) {
+    public synchronized void gotValueByHandle(GattToolWrapper w, int conn_handle, byte[] value, int status) {
         System.out.println("gotValueByHandle: " + conn_handle + ", " + status);
         if (status == 0 && value != null) {
             for (int i = 0; i < value.length; i++)
@@ -112,7 +112,7 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public void gotValueByUuid(int conn_handle, int handle, byte[] value) {
+    public void gotValueByUuid(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
         System.out.print("gotValueByUuid: " + conn_handle 
                 + ", handle: " + IntegralToString.intToHexString(handle, true, 4) 
                 + ", value: ");
@@ -124,49 +124,49 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     @Override
-    public synchronized void gotValueByUuidEnd(int conn_handle, int status) {
+    public synchronized void gotValueByUuidEnd(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("gotValueByUuid-end: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
 
     @Override
-    public void gotWriteResult(int conn_handle, int status) {
+    public void gotWriteResult(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("gotWriteResult: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void gotSecurityLevelResult(int conn_handle, int status) {
+    public synchronized void gotSecurityLevelResult(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("gotSecurityLevelResult: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void gotMtuResult(int conn_handle, int status) {
+    public synchronized void gotMtuResult(GattToolWrapper w, int conn_handle, int status) {
         System.out.println("gotMtuResult: " + conn_handle + ", status: " + status);
         this.notifyAll();
     }
     
     @Override
-    public synchronized void gotPsmResult(int psm) {
+    public synchronized void gotPsmResult(GattToolWrapper w, int psm) {
         System.out.println("gotPsmResult: " + ", psm: " + psm);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void processExit(int retcode) {
+    public synchronized void processExit(GattToolWrapper w, int retcode) {
         System.out.println("Process exited:  " + retcode);
         this.notifyAll();
     }
 
     @Override
-    public synchronized void processStdinClosed() {
+    public synchronized void processStdinClosed(GattToolWrapper w) {
         System.out.println("Process stdin lost!!!");
         this.notifyAll();
     }
 
     @Override
-    public void shellError(SHELL_ERRORS e) {
+    public void shellError(GattToolWrapper w, SHELL_ERRORS e) {
         if (e==SHELL_ERRORS.ADDRESS_CHANGED){
             System.out.println("ADDRESS CHANGED!!!");
             return;
@@ -176,9 +176,6 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
     public static void main(String [ ] args) throws IOException{
-        GattToolWrapper.initWorkerPool(1);
-        System.out.println("pool started");
-        
         GattToolWrapper w = GattToolWrapper.getWorker();
         GattToolWrapperTester wt = new GattToolWrapperTester();
         w.setListener(wt);
@@ -280,7 +277,7 @@ public class GattToolWrapperTester implements GattToolListener {
     }
 
 	@Override
-	public void gotWriteResultReq(int conn_handle, int status) {
+	public void gotWriteResultReq(GattToolWrapper w, int conn_handle, int status) {
 		// TODO Auto-generated method stub
 		
 	}

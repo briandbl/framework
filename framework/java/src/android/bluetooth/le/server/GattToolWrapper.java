@@ -55,7 +55,6 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 	private DataOutputStream mOutput;
 	private Worker mWorker;
 	private GattToolListener mListener;
-	private boolean mBusy;
 
 	private enum STATUS {
 		IDLE, CONNECTING, CONNECTED, DISCONNECTING, PRIMARY_DISCOVERY, PRIMARY_DISCOVERY_UUID, CHARACTERISTICS_DISCOVERY, CHARACTERISTICS_DESCRIPTOR_DISCOVERY, CHARACTERISTICS_READ_UUID, CHARACTERISTICS_READ_HANDLE, CHARACTERISTIC_WRITE_REQ, CHARACTERISTIC_WRITE_CMD, SET_SEC_LEVEL, SET_MTU, SET_PSM
@@ -63,31 +62,8 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 
 	private STATUS mStatus = STATUS.IDLE;
 
-	private static Set<GattToolWrapper> workerPool;
-
-	public static void initWorkerPool(int size) throws IOException {
-		if (workerPool != null) {
-			Log.e(TAG, "tried to initialize worker pool again");
-			return;
-		}
-
-		workerPool = new HashSet<GattToolWrapper>(size);
-		for (int i = 0; i < size; i++)
-			workerPool.add(new GattToolWrapper());
-	}
-
 	public synchronized static GattToolWrapper getWorker() {
-		Iterator<GattToolWrapper> it = workerPool.iterator();
-		while (it.hasNext()) {
-			GattToolWrapper w = it.next();
-			synchronized (w) {
-				if (w.mBusy == false) {
-					w.mBusy = true;
-					return w;
-				}
-			}
-		}
-		Log.e(TAG, "no more workers available creating one");
+		Log.e(TAG, "creating new worker");
 		try {
 			GattToolWrapper w = new GattToolWrapper();
 			return w;
@@ -98,9 +74,19 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 	}
 
 	public void releaseWorker() {
+		Log.v(TAG, "releaseWorker");
+		if (mProcess == null) {
+			Log.v(TAG, "release worker called twice");
+			// everything cleared cool
+			return;
+		}
+		
 		synchronized (this) {
-			sendCommand("disconnect");
-			mBusy = false;
+			mListener = null;
+			mWorker.running = false;
+			mWorker = null;
+			mProcess.destroy();
+			mProcess = null;
 		}
 	}
 	
@@ -131,11 +117,6 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 	}
 
 	private synchronized boolean sendCommand(String i) {
-		if (!mBusy) {
-			Log.e(TAG, "send command on non busy worker");
-			return false;
-		}
-
 		Log.v(TAG, "sendCommand " + i);
 		try {
 			mOutput.writeChars(i + "\n");
@@ -144,10 +125,6 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 			Log.e(TAG, "something went wrong", e);
 			return false;
 		}
-	}
-
-	public synchronized boolean isBusy() {
-		return mBusy;
 	}
 
 	public synchronized boolean connect(String address) {
@@ -166,7 +143,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 	}
 
 	public synchronized boolean disconnect() {
-		if (mStatus != STATUS.CONNECTED) {
+		/*if (mStatus != STATUS.CONNECTED) {
 			if (mStatus != STATUS.IDLE)
 				Log.e(TAG, "not connected");
 			else {
@@ -177,7 +154,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 
 		mStatus = STATUS.DISCONNECTING;
 		Log.v(TAG, "new status: " + mStatus);
-		return sendCommand("disconnect");
+		return sendCommand("disconnect");*/
+		
+		Log.e(TAG, "disconnect asked, releasing worker and letting BlueZ handle the pain");
+		this.releaseWorker();
+		return true;
+		
 	}
 
 	public synchronized boolean psm(int psm) {
@@ -442,7 +424,6 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 		mOutput = new DataOutputStream(mProcess.getOutputStream());
 		mWorker = new Worker(mInput, this);
 		mWorker.start();
-		mBusy = false;
 	}
 
 	public void setListener(GattToolListener l) {
@@ -452,17 +433,19 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 	protected class Worker extends Thread {
 		private BufferedReader in;
 		private WorkerHandler mHandler;
+		private boolean running;
 
 		private Worker(InputStream in, WorkerHandler h) {
 			this.in = new BufferedReader(new InputStreamReader(in));
 			this.mHandler = h;
+			running = true;
 		}
 
 		public void run() {
 			try {
 				Log.v(TAG, "starting worker");
 
-				while (true) {
+				while (running) {
 					String line = in.readLine();
 					if (line == null) {
 						Log.v(TAG, "EOF");
@@ -473,12 +456,16 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 						Log.v(TAG, "empty line");
 						continue;
 					}
+					if (running == false) // mnaranjo: I'm not sure if closing the process will trigger EOF.
+						break;
 					Log.v(TAG, "got line: " + line);
 					mHandler.lineReceived(line);
 				}
 			} catch (Exception e) {
 				Log.e(TAG, "something failed", e);
 			}
+			
+			Log.v(TAG, "worker ending");
 		}
 	}
 
@@ -487,11 +474,14 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 		try {
 			int exitCode = mProcess.exitValue();
 			Log.v(TAG, "Process stdin closed with retValue: " + exitCode);
-			mListener.processExit(exitCode);
+			if (mListener!=null)
+				mListener.processExit(this, exitCode);
 		} catch (IllegalThreadStateException e) {
 			Log.v(TAG, "Process stind closed but process is still running");
-			mListener.processStdinClosed();
-			this.mProcess.destroy();
+			if (mListener!=null)
+				mListener.processStdinClosed(this);
+			if (mProcess != null)
+				mProcess.destroy();
 		}
 	}
 
@@ -576,54 +566,57 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 	};
 
 	public interface GattToolListener {
-		public void onNotification(int conn_handle, int handle, byte[] value);
+		public void onNotification(GattToolWrapper instance, int conn_handle, 
+				int handle, byte[] value);
 
-		public void onIndication(int conn_handle, int handle, byte[] value);
+		public void onIndication(GattToolWrapper instance, int conn_handle, 
+				int handle, byte[] value);
 
-		public void connected(int conn_handle, String addr, int status);
+		public void connected(GattToolWrapper instance, int conn_handle, 
+				String addr, int status);
 
-		public void disconnected(int conn_handle, String addr);
+		public void disconnected(GattToolWrapper instance, int conn_handle, String addr);
 
-		public void primaryAll(int conn_handle, int start, int end,
+		public void primaryAll(GattToolWrapper instance, int conn_handle, int start, int end,
 				BleGattID uuid);
 
-		public void primaryAllEnd(int conn_handle, int status);
+		public void primaryAllEnd(GattToolWrapper instance, int conn_handle, int status);
 
-		public void primaryUuid(int conn_handle, int start, int end);
+		public void primaryUuid(GattToolWrapper instance, int conn_handle, int start, int end);
 
-		public void primaryUuidEnd(int conn_handle, int status);
+		public void primaryUuidEnd(GattToolWrapper instance, int conn_handle, int status);
 
-		public void characteristic(int conn_handle, int handle,
+		public void characteristic(GattToolWrapper instance, int conn_handle, int handle,
 				short properties, int value_handle, BleGattID uuid);
 
-		public void characteristicEnd(int conn_handle, int status);
+		public void characteristicEnd(GattToolWrapper instance, int conn_handle, int status);
 
-		public void characteristicDescriptor(int conn_handle, int handle,
+		public void characteristicDescriptor(GattToolWrapper instance, int conn_handle, int handle,
 				BleGattID uuid);
 
-		public void characteristicDescriptorEnd(int conn_handle, int status);
+		public void characteristicDescriptorEnd(GattToolWrapper instance, int conn_handle, int status);
 
-		public void gotValueByHandle(int conn_handle, byte[] value, int status);
+		public void gotValueByHandle(GattToolWrapper instance, int conn_handle, byte[] value, int status);
 
-		public void gotValueByUuid(int conn_handle, int handle, byte[] value);
+		public void gotValueByUuid(GattToolWrapper instance, int conn_handle, int handle, byte[] value);
 
-		public void gotValueByUuidEnd(int conn_handle, int status);
+		public void gotValueByUuidEnd(GattToolWrapper instance, int conn_handle, int status);
 
-		public void gotWriteResult(int conn_handle, int status);
+		public void gotWriteResult(GattToolWrapper instance, int conn_handle, int status);
 		
-		public void gotWriteResultReq(int conn_handle, int status);
+		public void gotWriteResultReq(GattToolWrapper instance, int conn_handle, int status);
 
-		public void gotSecurityLevelResult(int conn_handle, int status);
+		public void gotSecurityLevelResult(GattToolWrapper instance, int conn_handle, int status);
 
-		public void gotMtuResult(int conn_handle, int status);
+		public void gotMtuResult(GattToolWrapper instance, int conn_handle, int status);
 
-		public void gotPsmResult(int psm);
+		public void gotPsmResult(GattToolWrapper instance, int psm);
 
-		public void processExit(int retcode);
+		public void processExit(GattToolWrapper instance, int retcode);
 
-		public void processStdinClosed();
+		public void processStdinClosed(GattToolWrapper instance);
 
-		public void shellError(SHELL_ERRORS e);
+		public void shellError(GattToolWrapper instance, SHELL_ERRORS e);
 	}
 
 }
