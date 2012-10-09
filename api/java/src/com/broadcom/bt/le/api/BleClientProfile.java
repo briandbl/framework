@@ -19,6 +19,11 @@
 
 package com.broadcom.bt.le.api;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
@@ -31,9 +36,6 @@ import android.util.Log;
 
 import com.broadcom.bt.service.gatt.BluetoothGattID;
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
-
-import java.util.ArrayList;
-import java.util.HashMap;
 
 /**
  * Abstract base class, representing a Bluetooth LE Client Profile. <br>
@@ -61,9 +63,10 @@ public abstract class BleClientProfile
     private byte mClientIf = BleConstants.GATT_SERVICE_PRIMARY;
     private IBluetoothGatt mService;
     private BleClientCallback mCallback;
-    private HashMap<Integer, BluetoothDevice> mClientIDToDeviceMap;
-    private HashMap<BluetoothDevice, Integer> mDeviceToClientIDMap;
-    private ArrayList<BleGattID> mPeerServices = new ArrayList();
+    private Map<Integer, BluetoothDevice> mClientIDToDeviceMap;
+    private Map<BluetoothDevice, Integer> mDeviceToClientIDMap;
+    private ArrayList<BleGattID> mPeerServices = new ArrayList<BleGattID>();
+    private Map<BluetoothDevice, List<BleClientService>> mRegisteredServices;
     private GattServiceConnection mSvcConn;
     private Context mContext;
 
@@ -87,6 +90,7 @@ public abstract class BleClientProfile
 
         this.mClientIDToDeviceMap = new HashMap<Integer, BluetoothDevice>();
         this.mDeviceToClientIDMap = new HashMap<BluetoothDevice, Integer>();
+        mRegisteredServices = new HashMap<BluetoothDevice, List<BleClientService>>();
 
         this.mCallback = new BleClientCallback();
         this.mSvcConn = new GattServiceConnection(context);
@@ -372,10 +376,21 @@ public abstract class BleClientProfile
                     + ") - Device unavailable!");
             return BleConstants.GATT_ERROR;
         }
+        
+        if (!mRegisteredServices.containsKey(device)){
+        	Log.e(TAG, "no services registered");
+        	return BleConstants.GATT_ERROR;
+        }
 
-        this.mRequiredServices.get(BleConstants.GATT_SERVICE_PRIMARY).refresh(device);
-
-        return BleConstants.GATT_SUCCESS;
+        List<BleClientService> services = mRegisteredServices.get(device);
+        if (services.size()>0) {
+        	Log.v(TAG, "refreshing first service");
+        	services.get(0).refresh(device);
+        	return BleConstants.GATT_SUCCESS;
+        }
+        
+        Log.v(TAG, "no required or optional services");
+        return BleConstants.GATT_ERROR;
     }
 
     /**
@@ -387,7 +402,17 @@ public abstract class BleClientProfile
         Log.d(TAG, "refreshService (" + this.mAppUuid + ") address = s "
                 + device.getAddress() + "service = " + service.getServiceId());
 
-        return 0;
+        if (!mRegisteredServices.containsKey(device)){
+        	Log.e(TAG, "device doesn't provide this service");
+        	return BleConstants.GATT_ERROR;
+        }
+        
+        List<BleClientService> services = mRegisteredServices.get(device);
+        if (!services.contains(service)){
+        	service.refresh(device);
+        	return BleConstants.GATT_SUCCESS;
+        }
+        return BleConstants.GATT_ERROR;
     }
 
     /**
@@ -708,7 +733,7 @@ public abstract class BleClientProfile
             BleClientProfile.this.mPeerServices.clear();
             try
             {
-                BleClientProfile.this.mService.searchService(connID, mAppUuid);
+                BleClientProfile.this.mService.searchService(connID, null);
             } catch (RemoteException e) {
                 Log.d(TAG, "Error calling searchService " + e.toString());
             }
@@ -756,20 +781,45 @@ public abstract class BleClientProfile
                 Log.d(TAG, "mPeerServices is null");
                 return;
             }
+            
+            List<BleClientService> services = new ArrayList<BleClientService>();
 
             for (int i = 0; i < mRequiredServices.size(); i++) {
                 for (int j = 0; j < mPeerServices.size(); j++) {
-                    Log.v(TAG, "comparing " + mRequiredServices.get(i).getServiceId());
-                    Log.v(TAG, "with " + mPeerServices.get(j));
-                    if (mPeerServices.get(j).equals(mRequiredServices.get(i).getServiceId())) {
-                        mRequiredServices.get(i).setInstanceID(
-                                mClientIDToDeviceMap.get(connID),
-                                mPeerServices.get(j).getInstanceID());
+                	BleClientService required;
+					BleGattID peer;
+                	required = mRequiredServices.get(i);
+                	peer = mPeerServices.get(j);
+                    Log.v(TAG, "comparing " + required.getServiceId() + ", with " + peer);
+                    if (peer.equals(required.getServiceId())) {
+                        required.setInstanceID(mClientIDToDeviceMap.get(connID),
+                                peer.getInstanceID());
+                        services.add(required);
                         nServicesFound++;
                         break;
                     }
                 }
             }
+            
+			if (mOptionalServices != null) {
+				for (int i = 0; i < mOptionalServices.size(); i++) {
+					for (int j = 0; j < mPeerServices.size(); j++) {
+	                	BleClientService optional;
+						BleGattID peer;
+	                	optional = mOptionalServices.get(i);
+	                	peer = mPeerServices.get(j);
+						Log.v(TAG, "comparing "
+								+ optional.getServiceId() + ", with " + peer);
+						if (peer.equals(optional.getServiceId())) {
+							optional.setInstanceID(
+									mClientIDToDeviceMap.get(connID),
+									peer.getInstanceID());
+							services.add(optional);
+							break;
+						}
+					}
+				}
+			}
 
             Log.d(TAG, "BleClientCallback::onSearchResult - found "
                     + nServicesFound + " out of " + mRequiredServices.size()
@@ -779,16 +829,23 @@ public abstract class BleClientProfile
             if (device == null) {
                 Log.d(TAG,
                         "No bluetooth device in the device map for connid = " + connID);
+                return;
             }
-            else if (isDeviceDisconnecting(device)) {
+            
+            if (isDeviceDisconnecting(device)) {
                 Log.d(TAG, "Device disconnecting...");
+                return;
             }
-            else if (nServicesFound == mRequiredServices.size()) {
-                Log.d(TAG, "the num of Srvs found match the required srv size ");
-                onDeviceConnected(device);
-            } else {
-                Log.d(TAG, "the num of Srvs found DOES NOT match the required srv size ");
-            }
+            
+            if (nServicesFound < mRequiredServices.size()) {
+            	Log.d(TAG, "the num of Srvs found DOES NOT match the required srv size ");
+            	return;
+			}
+
+            BleClientProfile.this.mRegisteredServices.put(device, services);
+            Log.d(TAG, "the num of Srvs found match the required srv size ");
+			onDeviceConnected(device);
+
         }
     }
 }
