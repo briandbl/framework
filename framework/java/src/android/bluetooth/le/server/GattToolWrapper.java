@@ -432,12 +432,12 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 
 	protected class Worker extends Thread {
 		private BufferedReader in;
-		private WorkerHandler mHandler;
+		private GattToolWrapper mWrapper;
 		private boolean running;
 
-		private Worker(InputStream in, WorkerHandler h) {
+		private Worker(InputStream in, GattToolWrapper w) {
 			this.in = new BufferedReader(new InputStreamReader(in));
-			this.mHandler = h;
+			this.mWrapper = w;
 			running = true;
 		}
 
@@ -449,7 +449,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 					String line = in.readLine();
 					if (line == null) {
 						Log.v(TAG, "EOF");
-						mHandler.EOF();
+						mWrapper.EOF();
 						break;
 					}
 					if ("".equals(line.trim())) {
@@ -459,7 +459,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 					if (running == false) // mnaranjo: I'm not sure if closing the process will trigger EOF.
 						break;
 					Log.v(TAG, "got line: " + line);
-					mHandler.lineReceived(line);
+					mWrapper.lineReceived(line);
 				}
 			} catch (Exception e) {
 				Log.e(TAG, "something failed", e);
@@ -549,6 +549,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 			Log.v(TAG, "RESULT: " + command + ", " + handle + ", hash: " + this.hashCode() + ", " + argument);
 
 			if (mListener == null) {
+				this.notifyAll(); // release any lock just in case.
 				Log.v(TAG,
 						"parsed a command, but no one is listening, dropping");
 				return;
