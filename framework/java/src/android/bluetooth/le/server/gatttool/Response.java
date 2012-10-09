@@ -18,7 +18,7 @@ public class Response implements Cloneable{
     
     protected String mCommand;
     protected boolean mChangeStatus;
-    private GattToolWrapper mWrapper;
+    protected GattToolWrapper mWrapper;
     
     private Response(){
         Log.v(TAG, "initializing reponse listeners");
@@ -51,12 +51,14 @@ public class Response implements Cloneable{
             String command, int handle, String argument){
         Log.v(TAG, "Processing command: " + command);
         
-        if (!sCommands.containsKey(command))
-            return false;
+        if (!sCommands.containsKey(command)){
+        	w.notifyAll();
+        	return false;
+        }
         
         argument = argument.trim();
         
-        Log.v(TAG, "handle: " + handle + ", " + argument);
+        Log.v(TAG, "handle: " + handle + ", wrapper: " + w + ", " + argument);
         Response cmd;
         try {
             cmd = (Response)sCommands.get(command).clone();
@@ -88,7 +90,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, 
                 int conn_handle, int handle, byte[] val) {
-            listener.onIndication(mWrapper, conn_handle, handle, val);
+            listener.onIndication(super.mWrapper, conn_handle, handle, val);
             return true;
         }
     }
@@ -101,7 +103,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, 
                 int conn_handle, int handle, byte[] val) {
-            listener.onIndication(mWrapper, conn_handle, handle, val);
+            listener.onIndication(super.mWrapper, conn_handle, handle, val);
             return true;
         }
     }
@@ -131,7 +133,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int connHandle,
                 int status) {
-            listener.connected(mWrapper, mConnHandle, mAddr, status);
+            listener.connected(super.mWrapper, mConnHandle, mAddr, status);
             return true;
         }
     }
@@ -143,7 +145,7 @@ public class Response implements Cloneable{
 
         @Override
         protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
-            listener.disconnected(mWrapper, conn_handle, args.trim());
+            listener.disconnected(super.mWrapper, conn_handle, args.trim());
             return true;
         }
     }
@@ -173,7 +175,7 @@ public class Response implements Cloneable{
             end = Integer.parseInt(parts[1], 16);
             uuid = new BleGattID(parts[2]);
             Log.v(TAG, "PRIMARY-ALL start " + start + ", end " + end + ", uuid " + uuid);
-            listener.primaryAll(mWrapper, conn_handle, start, end, uuid);
+            listener.primaryAll(super.mWrapper, conn_handle, start, end, uuid);
             return true;
         }
     }
@@ -186,7 +188,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.primaryAllEnd(mWrapper, conn_handle, status);
+            listener.primaryAllEnd(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -212,7 +214,7 @@ public class Response implements Cloneable{
             start = Integer.parseInt(parts[0], 16);
             end = Integer.parseInt(parts[1], 16);
             Log.v(TAG, "PRIMARY-UUID start " + start + ", end " + end);
-            listener.primaryUuid(mWrapper, conn_handle, start, end);
+            listener.primaryUuid(super.mWrapper, conn_handle, start, end);
             return true;
         }
     }
@@ -225,7 +227,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.primaryUuidEnd(mWrapper, conn_handle, status);
+            listener.primaryUuidEnd(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -256,7 +258,7 @@ public class Response implements Cloneable{
             uuid = new BleGattID(parts[3]);
             Log.v(TAG, "CHAR handle " + handle + ", properties " + properties + 
                     ", value_handle " + value_handle + ", uuid " + uuid);
-            listener.characteristic(mWrapper, conn_handle, handle, properties, value_handle, uuid);
+            listener.characteristic(super.mWrapper, conn_handle, handle, properties, value_handle, uuid);
             return true;
         }
     }
@@ -269,7 +271,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.characteristicEnd(mWrapper, conn_handle, status);
+            listener.characteristicEnd(super.mWrapper, conn_handle, status);
             return false;
         }
     }
@@ -299,7 +301,7 @@ public class Response implements Cloneable{
             else
                 uuid = new BleGattID(Integer.parseInt(parts[1], 16));
             Log.v(TAG, "CHAR-DESC handle " + handle + ", uuid " + uuid);
-            listener.characteristicDescriptor(mWrapper, conn_handle, handle, uuid);
+            listener.characteristicDescriptor(super.mWrapper, conn_handle, handle, uuid);
             return true;
         }
     }
@@ -312,7 +314,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.characteristicDescriptorEnd(mWrapper, conn_handle, status);
+            listener.characteristicDescriptorEnd(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -330,7 +332,7 @@ public class Response implements Cloneable{
         @Override
         protected void callListener() {
             Log.v(TAG, "char-val-desc callListener");
-            mListener.gotValueByHandle(mWrapper, mConnHandle, mValue, mResult);
+            mListener.gotValueByHandle(super.mWrapper, mConnHandle, mValue, mResult);
         }
 
         @Override
@@ -381,7 +383,7 @@ public class Response implements Cloneable{
                 val[i] = GattToolWrapper.parseSignedByte(parts[1+i]);
             
             Log.v(TAG, "CHAR-READ-UUID handle " + handle + ", value "+ val);
-            listener.gotValueByUuid(mWrapper, conn_handle, handle, val);
+            listener.gotValueByUuid(super.mWrapper, conn_handle, handle, val);
             return true;
         }
     }
@@ -394,7 +396,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotValueByUuidEnd(mWrapper, conn_handle, status);
+            listener.gotValueByUuidEnd(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -407,7 +409,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotWriteResult(mWrapper, conn_handle, status);
+            listener.gotWriteResult(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -420,7 +422,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotWriteResultReq(mWrapper, conn_handle, status);
+            listener.gotWriteResultReq(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -433,7 +435,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotSecurityLevelResult(mWrapper, conn_handle, status);
+            listener.gotSecurityLevelResult(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -446,7 +448,7 @@ public class Response implements Cloneable{
         @Override
         protected boolean internalProcessArguments(GattToolListener listener, int conn_handle,
                 int status) {
-            listener.gotMtuResult(mWrapper, conn_handle, status);
+            listener.gotMtuResult(super.mWrapper, conn_handle, status);
             return true;
         }
     }
@@ -462,7 +464,7 @@ public class Response implements Cloneable{
         @Override
         protected void callListener() {
             Log.v(TAG, "psm calllistener");
-            mListener.gotPsmResult(mWrapper, mValue);
+            mListener.gotPsmResult(super.mWrapper, mValue);
         }
 
         protected boolean processArguments(GattToolListener listener, int conn_handle, 
