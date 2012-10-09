@@ -75,8 +75,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private Map<BluetoothGattID, AppWrapper> registeredApps = new HashMap<BluetoothGattID, AppWrapper>();
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
     private byte mNextAppID = 0;
-
-    private static final int GATTTOOL_POOL_SIZE = 1;
     
     private String toIntHexString(int t){
     	return IntegralToString.intToHexString(t, false, 0);
@@ -562,7 +560,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * Callback from GattToolWrapper when connection completes or fails.
      */
-    public synchronized void connected(GattToolWrapper w, int connID, String addr, int status) {
+    public void connected(GattToolWrapper w, int connID, String addr, int status) {
         Log.v(TAG, "connected " + addr + " -> " + connID + " " + status);
         if (!mPendingConnections.containsKey(addr)) {
             Log.e(TAG, "remote no longer pending!");
@@ -628,21 +626,25 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
         if (getDeviceType(remote) == BleAdapter.DEVICE_TYPE_BREDR) {
             Log.v(TAG, "Connecting to BR device, setting psm=31");
-            gtw.psm(31);
-            cw.deviceBR = true;
-            try {
-                cw.mGattTool.wait();
-            } catch (InterruptedException e) {
-                Log.e(TAG, "interrupt while setting psm", e);
+            synchronized (gtw){
+            	gtw.psm(31);
+                cw.deviceBR = true;
+            	try {
+            		gtw.wait();
+            	} catch (InterruptedException e) {
+            		Log.e(TAG, "interrupt while setting psm", e);
+            	}	
             }
         }
-        gtw.connect(remote);
+		synchronized (gtw) {
+			gtw.connect(remote);
 
-        if (foreground)
-            try {
-            	cw.mGattTool.wait();
-            } catch (InterruptedException e) {
-            }
+			if (foreground)
+				try {
+					cw.mGattTool.wait();
+				} catch (InterruptedException e) {
+				}
+		}
         Log.v(TAG, "open end");
     }
 
@@ -651,7 +653,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * Callback from GattToolWrapper that tells us when a connection has
      * been closed, for what ever reason it did.
      */
-    public synchronized void disconnected(GattToolWrapper w, int connID, String addr) {
+    public void disconnected(GattToolWrapper w, int connID, String addr) {
         Log.v(TAG, "disconnected " + addr + " -> " + connID);
         ConnectionWrapper cw;
         if (mPendingConnections.containsKey(addr)) {
@@ -707,14 +709,18 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             return;
         }
 
-        cw.mGattTool.releaseWorker();
-        if (foreground)
-            try {
-                cw.mGattTool.wait();
-            } catch (InterruptedException e) {
-                Log.e(TAG, "got interrupted while waiting for disconnection signal", e);
-            }
-        cw.mGattTool = null;
+		synchronized (cw.mGattTool) {
+			cw.mGattTool.releaseWorker();
+			if (foreground)
+				try {
+					cw.mGattTool.wait();
+				} catch (InterruptedException e) {
+					Log.e(TAG,
+							"got interrupted while waiting for disconnection signal",
+							e);
+				}
+		}
+		cw.mGattTool = null;        
     }
 
     /* *******************************************************************************
@@ -860,18 +866,20 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             Log.e(TAG, "invalid sec level");
             return;
         }
-        try {
-            cw.mGattTool.wait();
-        } catch (InterruptedException e) {
-            Log.e(TAG, "interrupted while waiting sec-level to settle");
-        }
+		synchronized (cw.mGattTool) {
+			try {
+				cw.mGattTool.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "interrupted while waiting sec-level to settle");
+			}
+		}
     }
     
     @Override
     /**
      * callback from GattToolWrapper to let us know sec-level transaction completed
      */
-    public synchronized void gotSecurityLevelResult(GattToolWrapper w, int conn_handle, int status) {
+    public void gotSecurityLevelResult(GattToolWrapper w, int conn_handle, int status) {
         Log.v(TAG, "got security level result " + conn_handle + " " + status);
         w.notifyAll();
     }
@@ -934,19 +942,21 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.services.clear();
             gatt.primaryDiscovery();
         }
-        try {
-			cw.mGattTool.wait();
-		} catch (InterruptedException e) {
-			Log.e(TAG, "interrupted on SearchService");
+		synchronized (cw.mGattTool) {
+			try {
+				cw.mGattTool.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "interrupted on SearchService");
+			}
+			Log.v(TAG, "searchService end");
 		}
-        Log.v(TAG, "searchService end");
     }
     
     @Override
     /**
      * This method is a GattToolWrapper callback that let us know for a primary result
      */
-    public synchronized void primaryAll(GattToolWrapper w, int connID, int start, int end, BleGattID uuid) {
+    public void primaryAll(GattToolWrapper w, int connID, int start, int end, BleGattID uuid) {
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryAll");
         if (cw == null){
         	w.notifyAll();
@@ -966,7 +976,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * GattToolWrapper callback to let us know the primary scan completed.
      */
-    public synchronized void primaryAllEnd(GattToolWrapper w, int connID, int status) {
+    public void primaryAllEnd(GattToolWrapper w, int connID, int status) {
         
     	ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryAllEnd");
         if (cw == null){
@@ -987,7 +997,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * from an uuid search.
      */
     @Override
-    public synchronized void primaryUuid(GattToolWrapper w, int connID, int start, int end) {
+    public void primaryUuid(GattToolWrapper w, int connID, int start, int end) {
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "primaryUuid");
         if (cw == null)
             return;
@@ -1001,7 +1011,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * callback that let us know a service search with uuid set completed.
      */
     @Override
-    public synchronized void primaryUuidEnd(GattToolWrapper w, int connID, int status) {
+    public void primaryUuidEnd(GattToolWrapper w, int connID, int status) {
         Log.v(TAG, "primaryUuidEnd " + connID + ", " + status);
         this.primaryAllEnd(w, connID, status);
     }
@@ -1083,10 +1093,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         
         cw.mGattTool.characteristicsDiscovery(s.start, s.end);
         
-        try {
-			cw.mGattTool.wait();
-		} catch (InterruptedException e) {
-			Log.e(TAG, "getFirstChar interrupted");
+		synchronized (cw.mGattTool) {
+			try {
+				cw.mGattTool.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "getFirstChar interrupted");
+			}
 		}
         
         Log.v(TAG, "getFirstChar end");
@@ -1096,7 +1108,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * GattToolWrapper callback that gets called once per discovered characteristic.
      */
-    public synchronized void characteristic(GattToolWrapper w, int connID, int handle, short properties, 
+    public void characteristic(GattToolWrapper w, int connID, int handle, short properties, 
     		int value_handle, BleGattID uuid) {
         Log.v(TAG, "got characteristic " + connID + " " + handle);
         
@@ -1113,7 +1125,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * GattToolWrapper callback telling characteristic discovery completed
      */
-    public synchronized void characteristicEnd(GattToolWrapper w, int connID, int status) {
+    public void characteristicEnd(GattToolWrapper w, int connID, int status) {
         Log.v(TAG, "characteristicEnd " + connID + " " + status);
         
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicEnd callback");
@@ -1228,19 +1240,22 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             c.end=s.end;
         c.lastDescriptor = null;
         
-        cw.mGattTool.characteristicsDescriptorDiscovery(c.handle+1, c.end);
-        try {
-			cw.mGattTool.wait();
-		} catch (InterruptedException e) {
-			Log.e(TAG, "getFirstCharDescr interrupted");
-		}  
+        synchronized (cw.mGattTool){
+			cw.mGattTool
+					.characteristicsDescriptorDiscovery(c.handle + 1, c.end);
+			try {
+				cw.mGattTool.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "getFirstCharDescr interrupted");
+			}  
+        }
     }
     
     @Override
     /**
      * GattToolWrapper callback called for each descriptor discovered
      */
-    public synchronized void characteristicDescriptor(GattToolWrapper w, int connID, int handle, BleGattID uuid) {
+    public void characteristicDescriptor(GattToolWrapper w, int connID, int handle, BleGattID uuid) {
         Log.v(TAG, "characteristicDescriptor " + connID + " " + handle + " " + uuid);        
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "getFirstCharDescr");
         if (cw == null) return;
@@ -1266,7 +1281,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     /**
      * GattToolWrapper callback called when descriptor discovery ended.
      */
-    public synchronized void characteristicDescriptorEnd(GattToolWrapper w, int connID, int status) {
+    public void characteristicDescriptorEnd(GattToolWrapper w, int connID, int status) {
         Log.v(TAG, "characteristicEnd " + connID + " " + status);
         
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "characteristicDescriptorEnd callback");
@@ -1399,12 +1414,14 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 cw.lastService = s;
                 s.lastChar = c;
                 c.lastDescriptor = d;
-                cw.mGattTool.readCharacteristicByHandle(d.handle);
-                try {
-                	cw.mGattTool.wait();
-                } catch (InterruptedException e){
-                	Log.e(TAG, "interrupted on readCharDescr", e);
-                }
+				synchronized (cw.mGattTool) {
+					cw.mGattTool.readCharacteristicByHandle(d.handle);
+					try {
+						cw.mGattTool.wait();
+					} catch (InterruptedException e) {
+						Log.e(TAG, "interrupted on readCharDescr", e);
+					}
+				}
                 return;
         	}
     	}
@@ -1446,19 +1463,21 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         cw.lastService = s;
         s.lastChar = c;
         c.lastDescriptor = null;
-        cw.mGattTool.readCharacteristicByHandle(c.value_handle);
-        try {
-        	cw.mGattTool.wait();
-        } catch (InterruptedException e){
-        	Log.e(TAG, "interrupted on readCharDescr", e);
-        }
+		synchronized (cw.mGattTool) {
+			cw.mGattTool.readCharacteristicByHandle(c.value_handle);
+			try {
+				cw.mGattTool.wait();
+			} catch (InterruptedException e) {
+				Log.e(TAG, "interrupted on readCharDescr", e);
+			}
+		}
     }
     
     @Override
     /**
      * This callback gets called when GattToolWrapper was able to resolve a value.
      */
-    public synchronized void gotValueByHandle(GattToolWrapper w, int connID, byte[] value, int status) {
+    public void gotValueByHandle(GattToolWrapper w, int connID, byte[] value, int status) {
         Log.v(TAG, "gotValueByHandle " + connID +" " + status +" got" + value);
         ConnectionWrapper cw = getConnectionWrapperForConnID(connID, "gotValueByHandle");
         if (cw==null) {
@@ -1493,13 +1512,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
     
     @Override
-    public synchronized void gotWriteResult(GattToolWrapper w, int connID, int status) {
+    public void gotWriteResult(GattToolWrapper w, int connID, int status) {
         Log.v(TAG, "gotWriteResult");
         w.notifyAll();
     }
     
     @Override
-    public synchronized void gotWriteResultReq(GattToolWrapper w, int connID, int status) {
+    public void gotWriteResultReq(GattToolWrapper w, int connID, int status) {
         Log.v(TAG, "gotWriteResultReq");
         
         Log.v(TAG, "gotWriteResultReq " + connID +" " + status);
@@ -1560,10 +1579,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.lastService = s;
             s.lastChar = c;
             c.lastDescriptor = null;
-            try {
-				cw.mGattTool.wait();
-			} catch (InterruptedException e) {
-				Log.e(TAG, "interrupted while writeCharValue");
+			synchronized (cw.mGattTool) {
+				try {
+					cw.mGattTool.wait();
+				} catch (InterruptedException e) {
+					Log.e(TAG, "interrupted while writeCharValue");
+				}
 			}
         } else {
             try {
@@ -1609,10 +1630,12 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.lastService = s;
             s.lastChar = c;
             c.lastDescriptor = d;
-            try {
-				cw.mGattTool.wait();
-			} catch (InterruptedException e) {
-				Log.e(TAG, "interrupted while writeCharValue");
+			synchronized (cw.mGattTool) {
+				try {
+					cw.mGattTool.wait();
+				} catch (InterruptedException e) {
+					Log.e(TAG, "interrupted while writeCharValue");
+				}
 			}
         } else { 
             try {
@@ -1684,7 +1707,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
     
     @Override
-    public synchronized void onNotification(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
+    public void onNotification(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
         Log.v(TAG, "onNotification " + conn_handle + toIntHexString(handle));
         
         ConnectionWrapper conn = getConnectionWrapperForConnID(conn_handle, "onNotification");
@@ -1985,54 +2008,54 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     }
 
     @Override
-    public synchronized void onIndication(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
+    public void onIndication(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
         Log.v(TAG, "onIndictation");
         w.notifyAll();
     }
 
     @Override
-    public synchronized void gotValueByUuid(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
+    public void gotValueByUuid(GattToolWrapper w, int conn_handle, int handle, byte[] value) {
         // TODO Auto-generated method stub
         Log.v(TAG, "gotValueByUuid");
         w.notifyAll();
     }
 
     @Override
-    public synchronized void gotValueByUuidEnd(GattToolWrapper w, int conn_handle, int status) {
+    public void gotValueByUuidEnd(GattToolWrapper w, int conn_handle, int status) {
         // TODO Auto-generated method stub
         Log.v(TAG, "gotValueByUuidEnd");
         w.notifyAll();
     }
 
     @Override
-    public synchronized void gotMtuResult(GattToolWrapper w, int connID, int status) {
+    public void gotMtuResult(GattToolWrapper w, int connID, int status) {
         Log.v(TAG, "gotMtuResult");
         w.notifyAll();
     }
 
     @Override
-    public synchronized void gotPsmResult(GattToolWrapper w, int psm) {
-        Log.v(TAG, "gotPsmResult " + psm);
+    public void gotPsmResult(GattToolWrapper w, int psm) {
+        Log.v(TAG, "gotPsmResult " + psm +  " " + w);
         w.notifyAll();
     }
 
     @Override
-    public synchronized void processExit(GattToolWrapper w, int retcode) {
+    public void processExit(GattToolWrapper w, int retcode) {
         // TODO Auto-generated method stub
         Log.e(TAG, "processExit with retcode " + retcode + " !!!!!!!!");
         w.notifyAll();
     }
 
     @Override
-    public synchronized void processStdinClosed(GattToolWrapper w) {
+    public void processStdinClosed(GattToolWrapper w) {
         // TODO Auto-generated method stub
         Log.v(TAG, "processStdinClosed");
         w.notifyAll();
     }
 
     @Override
-    public synchronized void shellError(GattToolWrapper w, SHELL_ERRORS e) {
+    public void shellError(GattToolWrapper w, SHELL_ERRORS e) {
         // TODO Auto-generated method stub
         Log.v(TAG, "shellError");
         w.notifyAll();
