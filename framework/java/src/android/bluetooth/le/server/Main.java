@@ -17,7 +17,6 @@ package android.bluetooth.le.server;
 
 import android.app.ActivityThread;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Looper;
 import android.os.ServiceManager;
 import android.util.Log;

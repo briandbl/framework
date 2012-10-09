@@ -16,17 +16,8 @@
 
 package android.bluetooth.le.server;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
 import java.util.Vector;
-import java.util.concurrent.locks.Lock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,12 +25,6 @@ import android.bluetooth.le.server.gatttool.Response;
 import android.util.Log;
 
 import com.broadcom.bt.le.api.BleGattID;
-
-interface WorkerHandler {
-    void EOF();
-
-    void lineReceived(String t);
-}
 
 interface internalGattToolListener {
     void commandCompleted();
@@ -49,10 +34,7 @@ interface internalGattToolListener {
     void disconnected();
 }
 
-public class GattToolWrapper implements WorkerHandler, internalGattToolListener {
-    private Process mProcess;
-    private DataInputStream mInput;
-    private DataOutputStream mOutput;
+public class GattToolWrapper implements Worker.Handler, internalGattToolListener {
     private Worker mWorker;
     private GattToolListener mListener;
 
@@ -75,7 +57,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
 
     public void releaseWorker() {
         Log.v(TAG, "releaseWorker");
-        if (mProcess == null) {
+        if (mWorker == null) {
             Log.v(TAG, "release worker called twice");
             // everything cleared cool
             return;
@@ -83,10 +65,8 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         
         synchronized (this) {
             mListener = null;
-            mWorker.running = false;
+            mWorker.quit();
             mWorker = null;
-            mProcess.destroy();
-            mProcess = null;
         }
     }
     
@@ -119,7 +99,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     private synchronized boolean sendCommand(String i) {
         Log.v(TAG, "sendCommand " + i);
         try {
-            mOutput.writeChars(i + "\n");
+            mWorker.getOutputStream().writeChars(i + "\n");
             return true;
         } catch (IOException e) {
             Log.e(TAG, "something went wrong", e);
@@ -418,11 +398,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
     public static String TAG = "GATTTOOL";
 
     public GattToolWrapper() throws IOException {
-        mProcess = new ProcessBuilder(TOOL, "-I").redirectErrorStream(true)
-                .start();
-        mInput = new DataInputStream(mProcess.getInputStream());
-        mOutput = new DataOutputStream(mProcess.getOutputStream());
-        mWorker = new Worker(mInput, this);
+        mWorker = new Worker(this, TOOL, "-I");
         mWorker.start();
     }
 
@@ -430,49 +406,9 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         this.mListener = l;
     }
 
-    protected class Worker extends Thread {
-        private BufferedReader in;
-        private GattToolWrapper mWrapper;
-        private boolean running;
-
-        private Worker(InputStream in, GattToolWrapper w) {
-            this.in = new BufferedReader(new InputStreamReader(in));
-            this.mWrapper = w;
-            running = true;
-        }
-
-        public void run() {
-            try {
-                Log.v(TAG, "starting worker");
-
-                while (running) {
-                    String line = in.readLine();
-                    if (line == null) {
-                        Log.v(TAG, "EOF");
-                        mWrapper.EOF();
-                        break;
-                    }
-                    if ("".equals(line.trim())) {
-                        Log.v(TAG, "empty line");
-                        continue;
-                    }
-                    if (running == false) // mnaranjo: I'm not sure if closing the process will trigger EOF.
-                        break;
-                    Log.v(TAG, "got line: " + line);
-                    mWrapper.lineReceived(line);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "something failed", e);
-            }
-            
-            Log.v(TAG, "worker ending");
-        }
-    }
-
     @Override
-    public void EOF() {
+    public void EOF(int exitCode) {
         try {
-            int exitCode = mProcess.exitValue();
             Log.v(TAG, "Process stdin closed with retValue: " + exitCode);
             if (mListener!=null)
                 mListener.processExit(this, exitCode);
@@ -480,8 +416,7 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
             Log.v(TAG, "Process stind closed but process is still running");
             if (mListener!=null)
                 mListener.processStdinClosed(this);
-            if (mProcess != null)
-                mProcess.destroy();
+            mWorker.quit();
         }
     }
 
@@ -505,8 +440,6 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
         END_COMMAND_RESULTS.add("MTU");
         END_COMMAND_RESULTS.add("PSM");
     }
-
-    private String mLastAddress = null;
 
     public synchronized void endCommand() {
         Log.v(TAG, "updating status, previous: " + mStatus);
@@ -533,7 +466,6 @@ public class GattToolWrapper implements WorkerHandler, internalGattToolListener 
             address = m.group(2);
             type = m.group(3);
             Log.i(TAG, "found prompt " + state + ", " + address + ", " + type);
-            mLastAddress = address;
             return;
         }
         m = RESULT.matcher(line);
