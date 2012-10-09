@@ -52,8 +52,8 @@ public class Response implements Cloneable{
         Log.v(TAG, "Processing command: " + command);
         
         if (!sCommands.containsKey(command)){
-        	w.notifyAll();
-        	return false;
+            w.notifyAll();
+            return false;
         }
         
         argument = argument.trim();

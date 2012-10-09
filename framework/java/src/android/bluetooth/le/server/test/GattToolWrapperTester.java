@@ -276,9 +276,9 @@ public class GattToolWrapperTester implements GattToolListener {
         }
     }
 
-	@Override
-	public void gotWriteResultReq(GattToolWrapper w, int conn_handle, int status) {
-		// TODO Auto-generated method stub
-		
-	}
+    @Override
+    public void gotWriteResultReq(GattToolWrapper w, int conn_handle, int status) {
+        // TODO Auto-generated method stub
+        
+    }
 }
