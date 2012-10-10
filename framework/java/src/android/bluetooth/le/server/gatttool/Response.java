@@ -145,6 +145,13 @@ public class Response implements Cloneable{
 
         @Override
         protected boolean processArguments(GattToolListener listener, int conn_handle, String args) {
+            Log.v(TAG, "DisconnectedResponse.processArguments " + listener + " " + conn_handle + " " + args);
+            if (args==null)
+                args = "";
+            if (listener == null){
+                Log.e(TAG, "no listener can't notify");
+                return false;
+            }
             listener.disconnected(super.mWrapper, conn_handle, args.trim());
             return true;
         }
