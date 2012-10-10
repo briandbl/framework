@@ -615,7 +615,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.mGattTool = gtw;
             mPendingConnections.put(remote, cw);
         } catch (Exception e) {
-            Log.e(TAG, "something failed while getting gatttool wrapper and connection wrapper");
+            Log.e(TAG, "something failed while getting gatttool wrapper and connection wrapper", e);
             try {
                 w.mCallback.onConnected(remote, -1);
             } catch (RemoteException e2) {
@@ -692,19 +692,13 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 + " connHandle " + connHandle);
 
         ConnectionWrapper cw = null;
-        if (connHandle == 0) {
-            if (mPendingConnections.containsKey(remote)) {
-                cw = mPendingConnections.get(remote);
-                mPendingConnections.remove(remote);
-            }
-        } else {
-            if (mConnectionMap.containsKey(connHandle)) {
-                cw = mConnectionMap.get(remote);
-                mConnectionMap.remove(remote);
-            }
-        }
-
-        if (cw == null) {
+        if (mPendingConnections.containsKey(remote)) {
+            cw = mPendingConnections.get(remote);
+            mPendingConnections.remove(remote);
+        } else if (mConnectionMap.containsKey(connHandle)) {
+            cw = mConnectionMap.get(connHandle);
+            mConnectionMap.remove(connHandle);
+        } else  {
             Log.e(TAG, "disconnect for non pending or known connection");
             return;
         }
@@ -719,6 +713,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                             "got interrupted while waiting for disconnection signal",
                             e);
                 }
+            try {
+                cw.wrapper.mCallback.onDisconnected(connHandle, remote);
+            } catch (RemoteException e) {
+                Log.e(TAG, "failed notifiying we closed the connection");
+            }
         }
         cw.mGattTool = null;        
     }

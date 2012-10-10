@@ -67,6 +67,7 @@ public class GattToolWrapper implements Worker.Handler, internalGattToolListener
             mListener = null;
             mWorker.quit();
             mWorker = null;
+            this.notifyAll();
         }
     }
     
@@ -399,7 +400,6 @@ public class GattToolWrapper implements Worker.Handler, internalGattToolListener
 
     public GattToolWrapper() throws IOException {
         mWorker = new Worker(this, TOOL, "-I");
-        mWorker.start();
     }
 
     public void setListener(GattToolListener l) {
