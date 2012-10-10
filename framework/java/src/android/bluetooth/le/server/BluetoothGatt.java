@@ -872,6 +872,43 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
 
     @Override
     /**
+     * Starts the bonding process with a remote device
+     */
+    public boolean createBond(String address) {
+        Log.v(TAG, "createBond for " + address);
+        
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
+            Log.e(TAG, "invalid address");
+            return false;
+        }
+        BluetoothDevice dev = this.mAdapter.getRemoteDevice(address);
+        if (dev.getBondState() != BluetoothDevice.BOND_NONE) {
+            Log.e(TAG, "bond state is not bond_none");
+            return false;
+        }
+        
+        Log.i(TAG, "starting bond process");
+        return dev.createBond();
+    }
+    
+    @Override
+    /**
+     * Cancels the bonding process with a remote device
+     */
+    public boolean cancelBond(String address) {
+        Log.v(TAG, "createBond for " + address);
+        
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) {
+            Log.e(TAG, "invalid address");
+            return false;
+        }
+        BluetoothDevice dev = this.mAdapter.getRemoteDevice(address);
+        Log.i(TAG, "canceling bond process");
+        return dev.cancelBondProcess();	
+    }
+    
+    @Override
+    /**
      * Change the security level of the connection.
      */
     public synchronized boolean setEncryption(String address, byte action) {
@@ -922,7 +959,6 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         return cw.sec_result;
     }
     
-
 
     @SuppressWarnings("unused")
     private ConnectionWrapper getConnectionWrapperForConnID(int connID) {

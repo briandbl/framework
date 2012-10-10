@@ -44,6 +44,10 @@ interface IBluetoothGatt {
     void unregisterApp(byte interfaceID);
 
     boolean setEncryption(in String address, byte action);
+    
+    boolean createBond(in String address);
+
+    boolean cancelBond(in String address);
 
     void setScanParameters(int scanInterval, int scanWindow);
 

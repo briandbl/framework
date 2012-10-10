@@ -124,7 +124,7 @@ public class BleAdapter implements IBinder.DeathRecipient
         this.init();
         
         if (mReceipent == null)
-        	mReceipent = this;
+            mReceipent = this;
     }
 
     /**
@@ -220,6 +220,22 @@ public class BleAdapter implements IBinder.DeathRecipient
                 Log.e(TAG, "error", e);
         }
         return false;
+    }
+    
+    public boolean createBond(String remote) {
+        try {
+            return mService.createBond(remote);
+        } catch (RemoteException e) {
+            throw new RuntimeException("Failed creating bond for " + remote);
+        }
+    }
+    
+    public boolean cancelBond(String remote) {
+        try {
+            return mService.cancelBond(remote);
+        } catch (RemoteException e) {
+            throw new RuntimeException("Failed canceling bond for " + remote);
+        }
     }
 
     /**
@@ -383,12 +399,12 @@ public class BleAdapter implements IBinder.DeathRecipient
 
     }
 
-	@Override
-	public void binderDied() {
-		Log.e(TAG, "btle-service died, broadcasting this");
-		this.mContext.sendBroadcast(new Intent(ACTION_BLE_DOWN));
-		mService = null;
-		startService();
-	}
+    @Override
+    public void binderDied() {
+        Log.e(TAG, "btle-service died, broadcasting this");
+        this.mContext.sendBroadcast(new Intent(ACTION_BLE_DOWN));
+        mService = null;
+        startService();
+    }
 
 }
