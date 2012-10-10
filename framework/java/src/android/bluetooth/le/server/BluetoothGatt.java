@@ -70,7 +70,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     public static final String BLUETOOTH_LE_SERVICE = BleConstants.BLUETOOTH_LE_SERVICE;
 
     public static int API_LEVEL = 5;
-    public static String FRAMEWORK_VERSION = "0.5.6";
+    public static String FRAMEWORK_VERSION = "0.5.7";
 
     private Map<BluetoothGattID, AppWrapper> registeredApps = new HashMap<BluetoothGattID, AppWrapper>();
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
