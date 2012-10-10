@@ -71,32 +71,33 @@ class Worker extends Thread {
             this.notifyAll();
         }
         ended = true;
+        Log.v(TAG, "worker ended");
     }
 
-    public synchronized void quit() {
+    public void quit() {
         this.running = false;
         if (ended && mProcess==null)
             return;
         
+        Log.v(TAG, "destroying process");
         this.mProcess.destroy();
         try {
             mInput.close();
         } catch (IOException e) {
             Log.e(TAG, "failed to close mInput", e);
         }
+        
+        Log.v(TAG, "closing input");
         try {
             mOutput.close();
         } catch (IOException e) {
             Log.e(TAG, "failed to close mOutput", e);
         }
-        try {
-            this.wait();
-        } catch (InterruptedException e) {
-            Log.e(TAG, "interrupted while waiting thread to exit", e);
-        }
+        
         mProcess = null;
         mInput = null;
         mOutput = null;
+        Log.v(TAG, "quit completed");
     }
     
     public DataOutputStream getOutputStream(){

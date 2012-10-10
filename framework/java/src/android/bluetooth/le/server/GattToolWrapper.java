@@ -67,7 +67,9 @@ public class GattToolWrapper implements Worker.Handler, internalGattToolListener
             mListener = null;
             mWorker.quit();
             mWorker = null;
+            this.notifyAll();
         }
+        Log.v(TAG, "worker released");
     }
     
     public synchronized void commandCompleted() {
@@ -399,7 +401,6 @@ public class GattToolWrapper implements Worker.Handler, internalGattToolListener
 
     public GattToolWrapper() throws IOException {
         mWorker = new Worker(this, TOOL, "-I");
-        mWorker.start();
     }
 
     public void setListener(GattToolListener l) {

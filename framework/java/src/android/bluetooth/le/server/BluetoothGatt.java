@@ -615,7 +615,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
             cw.mGattTool = gtw;
             mPendingConnections.put(remote, cw);
         } catch (Exception e) {
-            Log.e(TAG, "something failed while getting gatttool wrapper and connection wrapper");
+            Log.e(TAG, "something failed while getting gatttool wrapper and connection wrapper", e);
             try {
                 w.mCallback.onConnected(remote, -1);
             } catch (RemoteException e2) {
@@ -686,41 +686,34 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * cancel a pending connection. The way to tell what's the case is given by
      * connHandle, connHandle should be 0 for pending connections.
      */
-    public synchronized void close(final byte interfaceID, final String remote,
+    public void close(final byte interfaceID, final String remote,
             int connHandle, boolean foreground) {
         Log.v(TAG, "close called for " + remote + " ifaceID " + interfaceID
                 + " connHandle " + connHandle);
 
         ConnectionWrapper cw = null;
-        if (connHandle == 0) {
-            if (mPendingConnections.containsKey(remote)) {
-                cw = mPendingConnections.get(remote);
-                mPendingConnections.remove(remote);
-            }
-        } else {
-            if (mConnectionMap.containsKey(connHandle)) {
-                cw = mConnectionMap.get(remote);
-                mConnectionMap.remove(remote);
-            }
-        }
-
-        if (cw == null) {
+        if (mPendingConnections.containsKey(remote)) {
+            cw = mPendingConnections.get(remote);
+            mPendingConnections.remove(remote);
+        } else if (mConnectionMap.containsKey(connHandle)) {
+            cw = mConnectionMap.get(connHandle);
+            mConnectionMap.remove(connHandle);
+        } else  {
             Log.e(TAG, "disconnect for non pending or known connection");
             return;
         }
 
         synchronized (cw.mGattTool) {
             cw.mGattTool.releaseWorker();
-            if (foreground)
-                try {
-                    cw.mGattTool.wait();
-                } catch (InterruptedException e) {
-                    Log.e(TAG,
-                            "got interrupted while waiting for disconnection signal",
-                            e);
-                }
+            try {
+                Log.v(TAG, "about to notify closing completed");
+                cw.wrapper.mCallback.onDisconnected(connHandle, remote);
+            } catch (RemoteException e) {
+                Log.e(TAG, "failed notifiying we closed the connection");
+            }
         }
-        cw.mGattTool = null;        
+        cw.mGattTool = null;   
+        Log.v(TAG, "close done");
     }
 
     /* *******************************************************************************
