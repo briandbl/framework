@@ -30,20 +30,20 @@ import com.broadcom.bt.le.api.IBleProfileEventCallback;
 
 interface IBluetoothGatt {
 
-	int getApiLevel();
-	
-	String getFrameworkVersion();
+    int getApiLevel();
+    
+    String getFrameworkVersion();
 
-	byte getDeviceType(in String address);
+    byte getDeviceType(in String address);
 
     void getUUIDs(in String address);
-	
-	void registerApp(in BluetoothGattID appUuid,
+    
+    void registerApp(in BluetoothGattID appUuid,
                      in IBleClientCallback callback);
 
     void unregisterApp(byte interfaceID);
 
-    void setEncryption(in String address, byte action);
+    boolean setEncryption(in String address, byte action);
 
     void setScanParameters(int scanInterval, int scanWindow);
 

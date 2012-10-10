@@ -19,6 +19,11 @@
 
 package com.broadcom.bt.le.api;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -26,10 +31,8 @@ import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.util.Log;
 
+import com.broadcom.bt.le.api.exceptions.BondRequiredException;
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
-
-import java.util.ArrayList;
-import java.util.HashMap;
 
 public abstract class BleServerProfile
 {
@@ -177,14 +180,19 @@ public abstract class BleServerProfile
         mMtuMap.put(Integer.valueOf(connId), Integer.valueOf(mtuSize));
     }
 
-    public void setEncryption(String bdaddr, byte action)
+    public boolean setEncryption(String bdaddr, byte action) throws BondRequiredException
     {
+        BluetoothDevice d = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(bdaddr);
+        if (d.getBondState()!=BluetoothDevice.BOND_BONDED)
+            throw new BondRequiredException();
+        
         try
         {
-            mService.setEncryption(bdaddr, action);
+            return mService.setEncryption(bdaddr, action);
         } catch (Throwable t) {
             Log.e("BleServerProfile", "Unable to set encryption for connection", t);
         }
+        throw new BondRequiredException();
     }
 
     public void setScanParameters(int scanInterval, int scanWindow)

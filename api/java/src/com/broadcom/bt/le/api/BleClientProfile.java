@@ -34,6 +34,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.util.Log;
 
+import com.broadcom.bt.le.api.exceptions.BondRequiredException;
 import com.broadcom.bt.service.gatt.BluetoothGattID;
 import com.broadcom.bt.service.gatt.IBluetoothGatt;
 
@@ -201,14 +202,18 @@ public abstract class BleClientProfile
      * @param device Remote device with a currently active
      * @param action Encryption level for the active connection
      */
-    public void setEncryption(BluetoothDevice device, byte action)
+    public boolean setEncryption(BluetoothDevice device, byte action) throws BondRequiredException
     {
+        if (device.getBondState()!=BluetoothDevice.BOND_BONDED)
+            throw new BondRequiredException();
+        
         try
         {
-            this.mService.setEncryption(device.getAddress(), action);
-        } catch (RemoteException e) {
-            Log.e(TAG, e.toString());
+            return mService.setEncryption(device.getAddress(), action);
+        } catch (Throwable t) {
+            Log.e("BleClientProfile", "Unable to set encryption for connection", t);
         }
+        throw new BondRequiredException();
     }
 
     /**
@@ -378,15 +383,15 @@ public abstract class BleClientProfile
         }
         
         if (!mRegisteredServices.containsKey(device)){
-        	Log.e(TAG, "no services registered");
-        	return BleConstants.GATT_ERROR;
+            Log.e(TAG, "no services registered");
+            return BleConstants.GATT_ERROR;
         }
 
         List<BleClientService> services = mRegisteredServices.get(device);
         if (services.size()>0) {
-        	Log.v(TAG, "refreshing first service");
-        	services.get(0).refresh(device);
-        	return BleConstants.GATT_SUCCESS;
+            Log.v(TAG, "refreshing first service");
+            services.get(0).refresh(device);
+            return BleConstants.GATT_SUCCESS;
         }
         
         Log.v(TAG, "no required or optional services");
@@ -403,14 +408,14 @@ public abstract class BleClientProfile
                 + device.getAddress() + "service = " + service.getServiceId());
 
         if (!mRegisteredServices.containsKey(device)){
-        	Log.e(TAG, "device doesn't provide this service");
-        	return BleConstants.GATT_ERROR;
+            Log.e(TAG, "device doesn't provide this service");
+            return BleConstants.GATT_ERROR;
         }
         
         List<BleClientService> services = mRegisteredServices.get(device);
         if (!services.contains(service)){
-        	service.refresh(device);
-        	return BleConstants.GATT_SUCCESS;
+            service.refresh(device);
+            return BleConstants.GATT_SUCCESS;
         }
         return BleConstants.GATT_ERROR;
     }
@@ -637,33 +642,33 @@ public abstract class BleClientProfile
             Log.d(TAG, "Connected to GattService!");
             
             if (service == null){
-            	Log.e(TAG, "no service can't go on");
-            	return;
+                Log.e(TAG, "no service can't go on");
+                return;
             }
            
-			try {
-				BleClientProfile.this.mService = IBluetoothGatt.Stub
-						.asInterface(service);
+            try {
+                BleClientProfile.this.mService = IBluetoothGatt.Stub
+                        .asInterface(service);
 
-				for (int i = 0; i < BleClientProfile.this.mRequiredServices
-						.size(); i++) {
-					BleClientProfile.this.mRequiredServices.get(i).setProfile(
-							BleClientProfile.this);
-				}
+                for (int i = 0; i < BleClientProfile.this.mRequiredServices
+                        .size(); i++) {
+                    BleClientProfile.this.mRequiredServices.get(i).setProfile(
+                            BleClientProfile.this);
+                }
 
-				if (BleClientProfile.this.mOptionalServices != null) {
-					for (int i = 0; i < BleClientProfile.this.mOptionalServices
-							.size(); i++) {
-						BleClientProfile.this.mOptionalServices.get(i)
-								.setProfile(BleClientProfile.this);
-					}
-				}
+                if (BleClientProfile.this.mOptionalServices != null) {
+                    for (int i = 0; i < BleClientProfile.this.mOptionalServices
+                            .size(); i++) {
+                        BleClientProfile.this.mOptionalServices.get(i)
+                                .setProfile(BleClientProfile.this);
+                    }
+                }
 
-				BleClientProfile.this.onInitialized(true);
-			} catch (Throwable t) {
-				Log.e(TAG, "Unable to get Binder to GattService", t);
-				BleClientProfile.this.onInitialized(false);
-			}
+                BleClientProfile.this.onInitialized(true);
+            } catch (Throwable t) {
+                Log.e(TAG, "Unable to get Binder to GattService", t);
+                BleClientProfile.this.onInitialized(false);
+            }
         }
 
         public void onServiceDisconnected(ComponentName name)
@@ -725,7 +730,11 @@ public abstract class BleClientProfile
             if (d.getBondState() == BluetoothDevice.BOND_BONDED) {
                 Log.d(TAG,
                         "onConnected device is bonded start encrypt the  link");
-                BleClientProfile.this.setEncryption(d, (byte) 1);
+                try {
+                    BleClientProfile.this.setEncryption(d, BleConstants.GATT_ENCRYPT_MITM);
+                } catch (BondRequiredException e) {
+                    Log.e(TAG, "failed setting encryption", e);
+                }
             }
             BleClientProfile.this.mClientIDToDeviceMap.put(new Integer(connID), d);
             BleClientProfile.this.mDeviceToClientIDMap.put(d, new Integer(connID));
@@ -786,10 +795,10 @@ public abstract class BleClientProfile
 
             for (int i = 0; i < mRequiredServices.size(); i++) {
                 for (int j = 0; j < mPeerServices.size(); j++) {
-                	BleClientService required;
-					BleGattID peer;
-                	required = mRequiredServices.get(i);
-                	peer = mPeerServices.get(j);
+                    BleClientService required;
+                    BleGattID peer;
+                    required = mRequiredServices.get(i);
+                    peer = mPeerServices.get(j);
                     Log.v(TAG, "comparing " + required.getServiceId() + ", with " + peer);
                     if (peer.equals(required.getServiceId())) {
                         required.setInstanceID(mClientIDToDeviceMap.get(connID),
@@ -801,25 +810,25 @@ public abstract class BleClientProfile
                 }
             }
             
-			if (mOptionalServices != null) {
-				for (int i = 0; i < mOptionalServices.size(); i++) {
-					for (int j = 0; j < mPeerServices.size(); j++) {
-	                	BleClientService optional;
-						BleGattID peer;
-	                	optional = mOptionalServices.get(i);
-	                	peer = mPeerServices.get(j);
-						Log.v(TAG, "comparing "
-								+ optional.getServiceId() + ", with " + peer);
-						if (peer.equals(optional.getServiceId())) {
-							optional.setInstanceID(
-									mClientIDToDeviceMap.get(connID),
-									peer.getInstanceID());
-							services.add(optional);
-							break;
-						}
-					}
-				}
-			}
+            if (mOptionalServices != null) {
+                for (int i = 0; i < mOptionalServices.size(); i++) {
+                    for (int j = 0; j < mPeerServices.size(); j++) {
+                        BleClientService optional;
+                        BleGattID peer;
+                        optional = mOptionalServices.get(i);
+                        peer = mPeerServices.get(j);
+                        Log.v(TAG, "comparing "
+                                + optional.getServiceId() + ", with " + peer);
+                        if (peer.equals(optional.getServiceId())) {
+                            optional.setInstanceID(
+                                    mClientIDToDeviceMap.get(connID),
+                                    peer.getInstanceID());
+                            services.add(optional);
+                            break;
+                        }
+                    }
+                }
+            }
 
             Log.d(TAG, "BleClientCallback::onSearchResult - found "
                     + nServicesFound + " out of " + mRequiredServices.size()
@@ -838,13 +847,13 @@ public abstract class BleClientProfile
             }
             
             if (nServicesFound < mRequiredServices.size()) {
-            	Log.d(TAG, "the num of Srvs found DOES NOT match the required srv size ");
-            	return;
-			}
+                Log.d(TAG, "the num of Srvs found DOES NOT match the required srv size ");
+                return;
+            }
 
             BleClientProfile.this.mRegisteredServices.put(device, services);
             Log.d(TAG, "the num of Srvs found match the required srv size ");
-			onDeviceConnected(device);
+            onDeviceConnected(device);
 
         }
     }
