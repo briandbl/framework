@@ -76,6 +76,8 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
     private AppWrapper[] registeredAppsByID = new AppWrapper[Byte.MAX_VALUE];
     private byte mNextAppID = 0;
     
+    private Set<String> mLeDevices = new HashSet<String>();
+    
     private String toIntHexString(int t){
         return IntegralToString.intToHexString(t, false, 0);
     }
@@ -144,7 +146,9 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
      * Bluetooth Address.
      */
     public byte getDeviceType(String address) {
-        @SuppressWarnings("rawtypes")
+        if (mLeDevices.contains(address))
+            return BleConstants.GATT_TRANSPORT_LE;
+        
         Map<String, Variant> prop = null;
         try {
             prop = mBluezInterface.getDeviceProperties(address);
@@ -159,9 +163,26 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
          * 0 or no class at all BD/EDR provides: Address, Class, Icon, RSSI,
          * Name, Alias, LegacyPairing, Paired, UUIDs
          */
-        if (prop.containsKey("Broadcaster") || !prop.containsKey("Class"))
+        if (prop.containsKey("Icon"))
+            return BleAdapter.DEVICE_TYPE_BREDR;
+        
+        if (prop.containsKey("Broadcaster") || !prop.containsKey("Class")){
+            mLeDevices.add(address);
             return BleAdapter.DEVICE_TYPE_BLE;
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<Path> t = (List<Path>) prop.get("Services").getValue();
+        if (t!=null && t.size()>0) {
+            mLeDevices.add(address);
+            return BleAdapter.DEVICE_TYPE_BLE;
+        }
 
+        if (prop.get("Class").equals(new Integer(0))){
+            mLeDevices.add(address);
+            return BleAdapter.DEVICE_TYPE_BLE;
+        }
+        
         return BleAdapter.DEVICE_TYPE_BREDR;
     }
 
@@ -313,6 +334,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         intent.putExtra(BluetoothDevice.EXTRA_RSSI, rssi);
         intent.putExtra(BleAdapter.EXTRA_DEVICE_TYPE, BleAdapter.DEVICE_TYPE_BLE);
         broadcastIntent(intent);
+        mLeDevices.add(address);
     }
 
     @Override
@@ -423,6 +445,7 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         Map<BleGattID, List<Service>> services;
         BleGattID lastPrimaryUuid;
         Service lastService;
+        boolean sec_result;
         Map<Integer, Service> mServiceByHandle = new HashMap<Integer, Service>();
         Map<Integer, Characteristic> mCharacteristicByHandle = new HashMap<Integer, Characteristic>();
         Map<Integer, Attribute> mAttributesByHandle = new HashMap<Integer, Attribute>();
@@ -828,36 +851,65 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
         
         return null;
     }
+    
+    @Override
+    /**
+     * callback from GattToolWrapper to let us know sec-level transaction completed
+     */
+    public void gotSecurityLevelResult(GattToolWrapper w, int connID, int status) {
+        Log.v(TAG, "got security level result " + connID + " " + status);
+        
+        ConnectionWrapper cw = getConnectionWrapperForConnID(connID,"gotSecurityLevelResult");
+        if (cw==null){
+            Log.e(TAG, "no connection wrapper for this address");
+            w.notifyAll();
+            return;
+        }
+        
+        cw.sec_result = status == BleConstants.GATT_SUCCESS;
+        w.notifyAll();
+    }
 
     @Override
     /**
      * Change the security level of the connection.
      */
-    public synchronized void setEncryption(String address, byte action) {
+    public synchronized boolean setEncryption(String address, byte action) {
         Log.v(TAG, "setEncryption " + address + " " + action);
-        Log.e(TAG, "not implemented");
 
+        if (action == BleConstants.GATT_ENCRYPT_NONE) {
+            Log.v(TAG, "no encryption ignoring");
+            return false;
+        }
+        
         ConnectionWrapper cw = getConnectionWrapperForAddress(address);
         if (cw==null){
             Log.e(TAG, "no connection wrapper for this address");
-            return;
+            return false;
+        }
+        
+        BluetoothDevice mDevice = this.mAdapter.getRemoteDevice(address);
+        if (mDevice.getBondState()!=BluetoothDevice.BOND_BONDED){
+            Log.e(TAG, "need to be bonded first");
+            return false;
         }
         
         if (cw.mGattTool==null){
             Log.e(TAG, "no gatttool wrapper for this address");
-            return;
+            return false;
         }
+        
+        cw.sec_result = false;
 
-        if (action == BleConstants.GATT_AUTH_REQ_NO_MITM)
+        if (action == BleConstants.GATT_ENCRYPT)
             cw.mGattTool.secLevel(SEC_LEVEL.LOW);
-        if (action == BleConstants.GATT_AUTH_REQ_MITM)
+        if (action == BleConstants.GATT_ENCRYPT_NO_MITM)
             cw.mGattTool.secLevel(SEC_LEVEL.MEDIUM);
-        if (action == BleConstants.GATT_AUTH_REQ_SIGNED_NO_MITM || 
-                action == BleConstants.GATT_AUTH_REQ_SIGNED_MITM)
+        if (action == BleConstants.GATT_ENCRYPT_MITM)
             cw.mGattTool.secLevel(SEC_LEVEL.HIGH);
         else {
             Log.e(TAG, "invalid sec level");
-            return;
+            return false;
         }
         synchronized (cw.mGattTool) {
             try {
@@ -866,16 +918,11 @@ public class BluetoothGatt extends IBluetoothGatt.Stub implements
                 Log.e(TAG, "interrupted while waiting sec-level to settle");
             }
         }
+        
+        return cw.sec_result;
     }
     
-    @Override
-    /**
-     * callback from GattToolWrapper to let us know sec-level transaction completed
-     */
-    public void gotSecurityLevelResult(GattToolWrapper w, int conn_handle, int status) {
-        Log.v(TAG, "got security level result " + conn_handle + " " + status);
-        w.notifyAll();
-    }
+
 
     @SuppressWarnings("unused")
     private ConnectionWrapper getConnectionWrapperForConnID(int connID) {
